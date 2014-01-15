@@ -45,6 +45,7 @@ namespace Nancy.Json
         List<IEnumerable<JavaScriptConverter>> _converterList;
         int _maxJsonLength;
         int _recursionLimit;
+        bool _retainCasing;
         JavaScriptTypeResolver _typeResolver;
 
 #if NET_3_5
@@ -60,25 +61,24 @@ namespace Nancy.Json
         {
         }
 #else
-        internal static readonly JavaScriptSerializer DefaultSerializer = new JavaScriptSerializer(null, false, 102400, 100);
+        internal static readonly JavaScriptSerializer DefaultSerializer = new JavaScriptSerializer(null, false, 102400, 100, false);
 
         public JavaScriptSerializer()
-            : this(null, false, 102400, 100)
+            : this(null, false, 102400, 100, false)
         {
         }
 
         public JavaScriptSerializer(JavaScriptTypeResolver resolver)
-            : this(resolver, false, 102400, 100)
+            : this(resolver, false, 102400, 100, false)
         {
         }
 #endif
-        public JavaScriptSerializer(JavaScriptTypeResolver resolver, bool registerConverters, int maxJsonLength, int recursionLimit)
+        public JavaScriptSerializer(JavaScriptTypeResolver resolver, bool registerConverters, int maxJsonLength, int recursionLimit, bool retainCasing)
         {
             _typeResolver = resolver;
-
             _maxJsonLength = maxJsonLength;
-
             _recursionLimit = recursionLimit;
+            this.RetainCasing = retainCasing;
         }
 
 
@@ -109,6 +109,12 @@ namespace Nancy.Json
         internal JavaScriptTypeResolver TypeResolver
         {
             get { return _typeResolver; }
+        }
+
+        public bool RetainCasing
+        {
+            get { return this._retainCasing; }
+            set { this._retainCasing = value; }
         }
 
         public T ConvertToType<T>(object obj)
@@ -164,16 +170,22 @@ namespace Nancy.Json
                 return c.ConvertFrom(obj);
             }
 
-            /*
-             * Take care of the special case whereas in JSON an empty string ("") really means 
-             * an empty value 
-             * (see: https://bugzilla.novell.com/show_bug.cgi?id=328836)
-             */
+
             if ((type.IsGenericType) && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
             {
+                /*
+                 * Take care of the special case whereas in JSON an empty string ("") really means 
+                 * an empty value 
+                 * (see: https://bugzilla.novell.com/show_bug.cgi?id=328836)
+                 */
                 string s = obj as String;
-                if (String.IsNullOrEmpty(s))
-                    return null;
+                if (s != null)
+                {
+                    if (s == string.Empty)
+                        return null;
+                }
+                else //It is not string at all, convert to Nullable<> type, from int to uint for example
+                    return Convert.ChangeType (obj, type.GetGenericArguments ()[0]);
             }
 
             return Convert.ChangeType(obj, type);

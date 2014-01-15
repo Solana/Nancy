@@ -12,6 +12,7 @@ namespace Nancy.Diagnostics
     using Helpers;
     using ModelBinding;
 
+    using Nancy.Routing.Constraints;
     using Nancy.Routing.Trie;
 
     using Responses;
@@ -27,7 +28,17 @@ namespace Nancy.Diagnostics
 
         internal const string ItemsKey = "DIAGS_REQUEST";
 
-        public static void Enable(DiagnosticsConfiguration diagnosticsConfiguration, IPipelines pipelines, IEnumerable<IDiagnosticsProvider> providers, IRootPathProvider rootPathProvider, IEnumerable<ISerializer> serializers, IRequestTracing requestTracing, NancyInternalConfiguration configuration, IModelBinderLocator modelBinderLocator, IEnumerable<IResponseProcessor> responseProcessors, ICultureService cultureService)
+        public static void Enable(
+            DiagnosticsConfiguration diagnosticsConfiguration,
+            IPipelines pipelines,
+            IEnumerable<IDiagnosticsProvider> providers,
+            IRootPathProvider rootPathProvider,
+            IRequestTracing requestTracing,
+            NancyInternalConfiguration configuration,
+            IModelBinderLocator modelBinderLocator,
+            IEnumerable<IResponseProcessor> responseProcessors,
+            IEnumerable<IRouteSegmentConstraint> routeSegmentConstraints,
+            ICultureService cultureService)
         {
             var diagnosticsModuleCatalog = new DiagnosticsModuleCatalog(providers, rootPathProvider, requestTracing, configuration, diagnosticsConfiguration);
 
@@ -35,9 +46,9 @@ namespace Nancy.Diagnostics
 
             var diagnosticsRouteResolver = new DefaultRouteResolver(
                 diagnosticsModuleCatalog,
-                new DiagnosticsModuleBuilder(rootPathProvider, serializers, modelBinderLocator),
+                new DiagnosticsModuleBuilder(rootPathProvider, modelBinderLocator),
                 diagnosticsRouteCache,
-                new RouteResolverTrie(new TrieNodeFactory()));
+                new RouteResolverTrie(new TrieNodeFactory(routeSegmentConstraints)));
 
             var serializer = new DefaultObjectSerializer();
 

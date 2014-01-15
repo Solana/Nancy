@@ -3,10 +3,12 @@ namespace Nancy.Hosting.Aspnet.Tests
     using System;
     using System.Collections.Specialized;
     using System.IO;
-    using System.Threading.Tasks;
+    using System.Threading;
     using System.Web;
     using Nancy.Cookies;
     using FakeItEasy;
+
+    using Nancy.Helpers;
     using Nancy.Hosting.Aspnet;
     using Xunit;
 
@@ -43,14 +45,23 @@ namespace Nancy.Hosting.Aspnet.Tests
         public void Should_invoke_engine_with_requested_method()
         {
             // Given
+            var nancyContext = new NancyContext() {Response = new Response()};
             A.CallTo(() => this.request.HttpMethod).Returns("POST");
-            A.CallTo(() => this.engine.HandleRequest(A<Request>.Ignored)).Returns(new NancyContext() { Response = new Response() });
+            A.CallTo(() => this.engine.HandleRequest(
+                                        A<Request>.Ignored,
+                                        A<Func<NancyContext, NancyContext>>.Ignored,
+                                        A<CancellationToken>.Ignored))
+                                      .Returns(TaskHelpers.GetCompletedTask(nancyContext));
 
             // When
-            this.handler.ProcessRequest(this.context, ar => { }, new object());
+            var task = this.handler.ProcessRequest(this.context, ar => { }, new object());
+            NancyHandler.EndProcessRequest(task);
 
             // Then
-            A.CallTo(() => this.engine.HandleRequest(A<Request>.That.Matches(x => x.Method.Equals("POST")))).MustHaveHappened();
+            A.CallTo(() => this.engine.HandleRequest(A<Request>
+                .That
+                .Matches(x => x.Method.Equals("POST")), A<Func<NancyContext, NancyContext>>.Ignored, A<CancellationToken>.Ignored))
+                .MustHaveHappened();
         }
 
         [Fact]
@@ -69,7 +80,8 @@ namespace Nancy.Hosting.Aspnet.Tests
             SetupRequestProcess(nancyContext);
 
             // When
-            this.handler.ProcessRequest(context, ar => { }, new object());
+            var task = this.handler.ProcessRequest(context, ar => { }, new object());
+            NancyHandler.EndProcessRequest(task);
 
             // Then
             A.CallTo(() => this.response.AddHeader("Set-Cookie", "the first cookie")).MustHaveHappened();
@@ -86,12 +98,13 @@ namespace Nancy.Hosting.Aspnet.Tests
             A.CallTo(() => this.request.HttpMethod).Returns("GET");
             A.CallTo(() => this.engine.HandleRequest(
                                         A<Request>.Ignored,
-                                        A<Action<NancyContext>>.Ignored,
-                                        A<Action<Exception>>.Ignored))
-                                      .Invokes(f => ((Action<NancyContext>)f.Arguments[1]).Invoke(nancyContext));
+                                        A<Func<NancyContext, NancyContext>>.Ignored,
+                                        A<CancellationToken>.Ignored))
+                                      .Returns(TaskHelpers.GetCompletedTask(nancyContext));
 
             // When
-            var result = this.handler.ProcessRequest(this.context, ar => { }, new object()).Result;
+            var task = this.handler.ProcessRequest(this.context, ar => { }, new object());
+            NancyHandler.EndProcessRequest(task);
 
             // Then
             A.CallTo(() => disposable.Dispose()).MustHaveHappened(Repeated.Exactly.Once);
@@ -102,7 +115,11 @@ namespace Nancy.Hosting.Aspnet.Tests
             A.CallTo(() => this.request.AppRelativeCurrentExecutionFilePath).Returns("~/about");
             A.CallTo(() => this.request.Url).Returns(new Uri("http://ihatedummydata.com/about"));
             A.CallTo(() => this.request.HttpMethod).Returns("GET");
-            A.CallTo(() => this.engine.HandleRequest(A<Request>.Ignored)).Returns(nancyContext);
+            A.CallTo(() => this.engine.HandleRequest(
+                                        A<Request>.Ignored,
+                                        A<Func<NancyContext, NancyContext>>.Ignored,
+                                        A<CancellationToken>.Ignored))
+                                      .Returns(TaskHelpers.GetCompletedTask(nancyContext));
         }
     }
 }

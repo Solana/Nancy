@@ -19,8 +19,8 @@ end
 desc "Compiles solution and runs unit tests"
 task :default => [:clean, :assembly_info, :compile, :test, :publish, :package]
 
-desc "Executes all MSpec and Xunit tests"
-task :test => [:mspec, :xunit]
+desc "Executes all Xunit tests"
+task :test => [:xunit]
 
 desc "Compiles solution and runs unit tests for Mono"
 task :mono => [:clean, :assembly_info, :compilemono, :testmono]
@@ -47,7 +47,7 @@ end
 
 desc "Compile solution file"
 msbuild :compile => [:assembly_info] do |msb|
-    msb.properties = { :configuration => CONFIGURATION, "VisualStudioVersion" => ENV['VS110COMNTOOLS'] ? "11.0" : "10.0" }
+    msb.properties = { :configuration => CONFIGURATION, "VisualStudioVersion" => get_vs_version() }
     msb.targets :Clean, :Build
     msb.solution = SOLUTION_FILE
 end
@@ -58,7 +58,6 @@ xbuild :compilemono => [:assembly_info] do |xb|
     xb.properties = { :configuration => CONFIGURATIONMONO, "TargetFrameworkProfile" => "", "TargetFrameworkVersion" => "v4.0" }
 end
 
-
 desc "Gathers output files and copies them to the output folder"
 task :publish => [:compile] do
 
@@ -67,15 +66,7 @@ task :publish => [:compile] do
         mkpath(output)
     end
 
-    FileUtils.cp_r FileList["src/**/#{CONFIGURATION}/*.dll", "src/**/#{CONFIGURATION}/*.pdb", "src/**/*.ps1"].exclude(/obj\//).exclude(/.Tests/), output
-end
-
-desc "Executes MSpec tests"
-mspec :mspec => [:compile] do |mspec|
-    #This is a bit fragile but this is the only mspec assembly at present. 
-    #Fails if passed a FileList of all tests. Need to investigate.
-    mspec.command = "tools/mspec/mspec.exe"
-    mspec.assemblies "src/Nancy.Tests/bin/Release/Nancy.Tests.dll"
+    FileUtils.cp_r FileList["src/**/#{CONFIGURATION}/*.dll", "src/**/#{CONFIGURATION}/*.XML", "src/**/#{CONFIGURATION}/*.pdb", "src/**/*.ps1"].exclude(/obj\//).exclude(/.Tests/), output
 end
 
 desc "Executes xUnit tests"
@@ -248,6 +239,10 @@ def get_assembly_version(file)
   end
 
   ''
+end
+
+def get_vs_version()
+  return ENV['VS120COMNTOOLS'] ? "12.0" : ENV['VS110COMNTOOLS'] ? "11.0" : "10.0"
 end
 
 $nancy_version = get_assembly_version SHARED_ASSEMBLY_INFO

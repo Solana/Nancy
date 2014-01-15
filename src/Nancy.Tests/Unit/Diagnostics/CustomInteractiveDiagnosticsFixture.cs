@@ -3,9 +3,6 @@
     using System;
     using System.Collections.Generic;
     using System.Linq;
-
-    using Fakes;
-    using FakeItEasy;
     using Nancy.Bootstrapper;
     using Nancy.Cookies;
     using Nancy.Cryptography;
@@ -13,7 +10,9 @@
     using Nancy.Diagnostics;
     using Nancy.ModelBinding;
     using Nancy.Responses.Negotiation;
+    using Nancy.Routing.Constraints;
     using Nancy.Testing;
+    using Nancy.Tests; //While this directive is redundant, it's required to build on mono 2.x to allow it to resolve the Should* extension methods
     using Xunit;
 
     public class CustomInteractiveDiagnosticsHookFixture
@@ -35,29 +34,46 @@
             private readonly DiagnosticsConfiguration diagnosticsConfiguration;
             private readonly IEnumerable<IDiagnosticsProvider> diagnosticProviders;
             private readonly IRootPathProvider rootPathProvider;
-            private readonly IEnumerable<ISerializer> serializers;
             private readonly IRequestTracing requestTracing;
             private readonly NancyInternalConfiguration configuration;
             private readonly IModelBinderLocator modelBinderLocator;
             private readonly IEnumerable<IResponseProcessor> responseProcessors;
+            private readonly IEnumerable<IRouteSegmentConstraint> routeSegmentConstraints;
             private readonly ICultureService cultureService;
 
-            public FakeDiagnostics(DiagnosticsConfiguration diagnosticsConfiguration, IEnumerable<IDiagnosticsProvider> diagnosticProviders, IRootPathProvider rootPathProvider, IEnumerable<ISerializer> serializers, IRequestTracing requestTracing, NancyInternalConfiguration configuration, IModelBinderLocator modelBinderLocator, IEnumerable<IResponseProcessor> responseProcessors, ICultureService cultureService)
+            public FakeDiagnostics(
+                DiagnosticsConfiguration diagnosticsConfiguration,
+                IRootPathProvider rootPathProvider,
+                IRequestTracing requestTracing,
+                NancyInternalConfiguration configuration,
+                IModelBinderLocator modelBinderLocator,
+                IEnumerable<IResponseProcessor> responseProcessors,
+                IEnumerable<IRouteSegmentConstraint> routeSegmentConstraints,
+                ICultureService cultureService)
             {
                 this.diagnosticsConfiguration = diagnosticsConfiguration;
                 this.diagnosticProviders = (new IDiagnosticsProvider[] { new FakeDiagnosticsProvider() }).ToArray();
                 this.rootPathProvider = rootPathProvider;
-                this.serializers = serializers;
                 this.requestTracing = requestTracing;
                 this.configuration = configuration;
                 this.modelBinderLocator = modelBinderLocator;
                 this.responseProcessors = responseProcessors;
+                this.routeSegmentConstraints = routeSegmentConstraints;
                 this.cultureService = cultureService;
             }
 
             public void Initialize(IPipelines pipelines)
             {
-                DiagnosticsHook.Enable(this.diagnosticsConfiguration, pipelines, this.diagnosticProviders, this.rootPathProvider, this.serializers, this.requestTracing, this.configuration, this.modelBinderLocator, this.responseProcessors, this.cultureService);
+                DiagnosticsHook.Enable(this.diagnosticsConfiguration,
+                    pipelines,
+                    this.diagnosticProviders,
+                    this.rootPathProvider,
+                    this.requestTracing,
+                    this.configuration,
+                    this.modelBinderLocator,
+                    this.responseProcessors,
+                    this.routeSegmentConstraints,
+                    this.cultureService);
             }
         }
 
@@ -123,16 +139,6 @@
             var hmacString = Convert.ToBase64String(hmacBytes);
 
             return String.Format("{1}{0}", encryptedSession, hmacString);
-        }
-
-        private DiagnosticsSession DecodeCookie(INancyCookie nancyCookie)
-        {
-            var cookieValue = nancyCookie.Value;
-            var hmacStringLength = Base64Helpers.GetBase64Length(this.cryptoConfig.HmacProvider.HmacLength);
-            var encryptedSession = cookieValue.Substring(hmacStringLength);
-            var decrypted = this.cryptoConfig.EncryptionProvider.Decrypt(encryptedSession);
-
-            return this.objectSerializer.Deserialize(decrypted) as DiagnosticsSession;
         }
     }
 }

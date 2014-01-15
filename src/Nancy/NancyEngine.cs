@@ -70,64 +70,8 @@
         /// <value>An <see cref="IPipelines"/> instance.</value>
         public Func<NancyContext, IPipelines> RequestPipelinesFactory { get; set; }
 
-        /// <summary>
-        /// Handles an incoming <see cref="Request"/>.
-        /// </summary>
-        /// <param name="request">An <see cref="Request"/> instance, containing the information about the current request.</param>
-        /// <returns>A <see cref="NancyContext"/> instance containing the request/response context.</returns>
-        public NancyContext HandleRequest(Request request)
+        public Task<NancyContext> HandleRequest(Request request, Func<NancyContext, NancyContext> preRequest, CancellationToken cancellationToken)
         {
-            return this.HandleRequest(request, context => context);
-        }
-
-        /// <summary>
-        /// Handles an incoming <see cref="Request"/> async.
-        /// </summary>
-        /// <param name="request">An <see cref="Request"/> instance, containing the information about the current request.</param>
-        /// <param name="onComplete">Delegate to call when the request is complete</param>
-        /// <param name="onError">Deletate to call when any errors occur</param>
-        public void HandleRequest(Request request, Action<NancyContext> onComplete, Action<Exception> onError)
-        {
-            this.HandleRequest(request, null, onComplete, onError);
-        }
-
-        /// <summary>
-        /// Handles an incoming <see cref="Request"/>.
-        /// </summary>
-        /// <param name="request">An <see cref="Request"/> instance, containing the information about the current request.</param>
-        /// <param name="preRequest">Delegate to call before the request is processed</param>
-        /// <returns>A <see cref="NancyContext"/> instance containing the request/response context.</returns>
-        private NancyContext HandleRequest(Request request, Func<NancyContext, NancyContext> preRequest)
-        {
-            var task = this.HandleRequestInternal(request, preRequest);
-
-            task.Wait();
-
-            if (task.IsFaulted)
-            {
-                throw task.Exception ?? new Exception("Request task faulted");
-            }
-
-            return task.Result;
-        }
-
-        /// <summary>
-        /// Handles an incoming <see cref="Request"/> async.
-        /// </summary>
-        /// <param name="request">An <see cref="Request"/> instance, containing the information about the current request.</param>
-        /// <param name="preRequest">Pre request hook from the host</param>
-        /// <param name="onComplete">Delegate to call when the request is complete</param>
-        /// <param name="onError">Deletate to call when any errors occur</param>
-        public void HandleRequest(Request request, Func<NancyContext, NancyContext> preRequest, Action<NancyContext> onComplete, Action<Exception> onError)
-        {
-            this.HandleRequestInternal(request, preRequest)
-                .WhenCompleted(t => onComplete(t.Result), t => onError(t.Exception));
-        }
-
-        private Task<NancyContext> HandleRequestInternal(Request request, Func<NancyContext, NancyContext> preRequest)
-        {
-            // TODO - replace continuations with a fast continue from the pipeline spike
-
             var tcs = new TaskCompletionSource<NancyContext>();
 
             if (request == null)
@@ -150,12 +94,7 @@
                 return tcs.Task;
             }
 
-            var pipelines =
-                this.RequestPipelinesFactory.Invoke(context);
-
-            // TODO - potentially get this passed in so requests can be cancelled
-            var cancellationToken = new CancellationToken();
-            context.Items["CANCELLATION_TOKEN"] = cancellationToken; // So we get disposed when the request is complete
+            var pipelines = this.RequestPipelinesFactory.Invoke(context);
 
             var task = this.InvokeRequestLifeCycle(context, cancellationToken, pipelines);
 
@@ -261,16 +200,7 @@
 
             preHookTask.WhenCompleted(t =>
                 {
-                    if (t.Result != null)
-                    {
-                        context.Response = t.Result;
-
-                        tcs.SetResult(context);
-
-                        return;
-                    }
-
-                    var dispatchTask = this.dispatcher.Dispatch(context, cancellationToken);
+                    var dispatchTask = t.Result != null ? TaskHelpers.GetCompletedTask(t.Result) : this.dispatcher.Dispatch(context, cancellationToken);
 
                     dispatchTask.WhenCompleted(
                         completedTask =>
@@ -284,7 +214,6 @@
                                 HandleFaultedTask(context, pipelines, tcs));
                         },
                         HandleFaultedTask(context, pipelines, tcs));
-
                 },
                 HandleFaultedTask(context, pipelines, tcs));
 
@@ -297,7 +226,9 @@
                 {
                     try
                     {
-                        InvokeOnErrorHook(context, pipelines.OnError, t.Exception);
+                        var flattenedException = FlattenException(t.Exception);
+
+                        InvokeOnErrorHook(context, pipelines.OnError, flattenedException);
 
                         tcs.SetResult(context);
                     }
@@ -320,7 +251,7 @@
 
         private Task InvokePostRequestHook(NancyContext context, CancellationToken cancellationToken, AfterPipeline pipeline)
         {
-            return pipeline.Invoke(context, cancellationToken);
+            return pipeline == null ? TaskHelpers.GetCompletedTask() : pipeline.Invoke(context, cancellationToken);
         }
 
         private static void InvokeOnErrorHook(NancyContext context, ErrorPipeline pipeline, Exception ex)
@@ -347,6 +278,32 @@
                 context.Items[ERROR_KEY] = e.ToString();
                 context.Items[ERROR_EXCEPTION] = e;
             }
+        }
+
+        private static Exception FlattenException(Exception exception)
+        {
+            if (exception is AggregateException)
+            {
+                var aggregateException = exception as AggregateException;
+
+                var flattenedAggregateException = aggregateException.Flatten();
+
+                //If we have more than one exception in the AggregateException
+                //we have to send all exceptions back in order not to swallow any exceptions.
+                if (flattenedAggregateException.InnerExceptions.Count > 1)
+                {
+                    return flattenedAggregateException;
+                }
+
+                return flattenedAggregateException.InnerException;
+            }
+
+            if (exception != null && exception.InnerException != null)
+            {
+                return FlattenException(exception.InnerException);
+            }
+
+            return exception;
         }
     }
 }

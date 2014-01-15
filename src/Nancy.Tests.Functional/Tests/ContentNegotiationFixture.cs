@@ -5,7 +5,6 @@ namespace Nancy.Tests.Functional.Tests
     using System.IO;
     using System.Linq;
     using Cookies;
-    using Nancy.ErrorHandling;
     using Nancy.IO;
     using Nancy.Responses.Negotiation;
     using Nancy.Testing;
@@ -144,6 +143,39 @@ namespace Nancy.Tests.Functional.Tests
             // Then
             Assert.True(response.Headers.ContainsKey("foo"));
             Assert.Equal("bar", response.Headers["foo"]);
+        }
+
+        [Fact]
+        public void Should_set_reason_phrase_on_response()
+        {
+            // Given
+            var module = new ConfigurableNancyModule(with =>
+            {
+                with.Get("/customPhrase", (x, m) =>
+                {
+                    var context =
+                        new NancyContext { NegotiationContext = new NegotiationContext() };
+
+                    var negotiator =
+                        new Negotiator(context);
+                    negotiator.WithReasonPhrase("The test is passing!");
+
+                    return negotiator;
+                });
+            });
+
+            var brower = new Browser(with =>
+            {
+                with.ResponseProcessor<TestProcessor>();
+
+                with.Module(module);
+            });
+
+            // When
+            var response = brower.Get("/customPhrase");
+
+            // Then
+            Assert.Equal("The test is passing!", response.ReasonPhrase);  
         }
 
         [Fact]
@@ -307,6 +339,23 @@ namespace Nancy.Tests.Functional.Tests
             {
                 with.Accept("foo/bar", 0.9m);
             });
+
+            // Then
+            Assert.Equal(HttpStatusCode.NotAcceptable, response.StatusCode);
+        }
+
+        [Fact]
+        public void Should_respond_with_notacceptable_when_no_processor_can_process_media_range()
+        {
+            // Given
+            var browser = new Browser(with =>
+            {
+                with.ResponseProcessor<NullProcessor>();
+                with.Module<NegotiationModule>();
+            });
+
+            // When
+            var response = browser.Get("/invalid-view-name", with => with.Accept("foo/bar"));
 
             // Then
             Assert.Equal(HttpStatusCode.NotAcceptable, response.StatusCode);
@@ -579,11 +628,30 @@ namespace Nancy.Tests.Functional.Tests
         [Fact]
         public void Should_not_try_and_serve_view_with_invalid_name()
         {
+            // Given
             var browser = new Browser(with => with.Module<NegotiationModule>());
 
+            // When
             var result = Record.Exception(() => browser.Get("/invalid-view-name"));
 
+            // Then
             Assert.True(result.ToString().Contains("Unable to locate view"));
+        }
+
+        [Fact]
+        public void Should_return_response_negotiated_based_on_media_range()
+        {
+            // Given
+            var browser = new Browser(with => with.Module<NegotiationModule>());
+
+            // When
+            var result = browser.Get("/negotiate", with =>
+            {
+                with.Accept("text/html");
+            });
+
+            // Then
+            Assert.Equal(HttpStatusCode.SeeOther, result.StatusCode);
         }
 
         private static Func<dynamic, NancyModule, dynamic> CreateNegotiatedResponse(Action<Negotiator> action = null)
@@ -636,8 +704,6 @@ namespace Nancy.Tests.Functional.Tests
 
         public class NullProcessor : IResponseProcessor
         {
-            private const string ResponseTemplate = "{0}\n{1}";
-
             public IEnumerable<Tuple<string, MediaRange>> ExtensionMappings
             {
                 get
@@ -663,8 +729,6 @@ namespace Nancy.Tests.Functional.Tests
 
         public class ModelProcessor : IResponseProcessor
         {
-            private const string ResponseTemplate = "{0}\n{1}";
-
             public IEnumerable<Tuple<string, MediaRange>> ExtensionMappings
             {
                 get
@@ -692,7 +756,17 @@ namespace Nancy.Tests.Functional.Tests
         {
             public NegotiationModule()
             {
-                Get["/invalid-view-name"] = _ => this.GetModel();
+                Get["/invalid-view-name"] = _ =>
+                {
+                    return this.GetModel();
+                };
+
+                Get["/negotiate"] = parameters =>
+                {
+                    return Negotiate
+                        .WithMediaRangeResponse("text/html", Response.AsRedirect("/"))
+                        .WithMediaRangeModel("application/json", new { Name = "Nancy" });
+                };
             }
 
             private IEnumerable<Foo> GetModel()
