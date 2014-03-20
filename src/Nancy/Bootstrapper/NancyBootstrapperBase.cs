@@ -283,7 +283,7 @@
 
             if (this.FavIcon != null)
             {
-                this.ApplicationPipelines.BeforeRequest.AddItemToStartOfPipeline(ctx =>
+                this.ApplicatioanPipelines.BeforeRequest.AddItemToStartOfPipeline(ctx =>
                     {
                         if (ctx.Request == null || String.IsNullOrEmpty(ctx.Request.Path))
                         {
