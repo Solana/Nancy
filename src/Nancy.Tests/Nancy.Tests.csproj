@@ -184,6 +184,7 @@
     <Compile Include="Unit\NancyModuleFixture.cs" />
     <Compile Include="Unit\AfterPipelineFixture.cs" />
     <Compile Include="Unit\BeforePipelineFixture.cs" />
+    <Compile Include="Unit\ErrorPipelineFixture.cs" />
     <Compile Include="Unit\RequestFixture.cs" />
     <Compile Include="Fakes\FakeModuleCatalog.cs" />
     <Compile Include="Unit\DefaultResponseFormatterFixture.cs" />
@@ -196,6 +197,7 @@
     <Compile Include="Unit\Responses\StreamResponseFixture.cs" />
     <Compile Include="Unit\Responses\TextResponseFixture.cs" />
     <Compile Include="Unit\Routing\ConstraintNodeRouteResolverFixture.cs" />
+    <Compile Include="Unit\Routing\ConstraintNodeRouteScoringFixture.cs" />
     <Compile Include="Unit\Routing\DefaultNancyModuleBuilderFixture.cs" />
     <Compile Include="Unit\Routing\DefaultRequestDispatcherFixture.cs" />
     <Compile Include="Unit\Routing\DefaultRouteCacheProviderFixture.cs" />
@@ -217,6 +219,7 @@
     <Compile Include="Unit\Security\DefaultCsrfTokenValidatorFixture.cs" />
     <Compile Include="Unit\Security\ModuleSecurityFixture.cs" />
     <Compile Include="Unit\Security\UserIdentityExtensionsFixture.cs" />
+    <Compile Include="Unit\Sessions\CookieBasedSessionsConfigurationFixture.cs" />
     <Compile Include="Unit\Sessions\CookieBasedSessionsFixture.cs" />
     <Compile Include="Unit\Cryptography\RijndaelEncryptionProviderFixture.cs" />
     <Compile Include="Unit\Sessions\DefaultSessionObjectFormatterFixture.cs" />
