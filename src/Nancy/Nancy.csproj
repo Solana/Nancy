@@ -150,6 +150,7 @@
     <Compile Include="Culture\DefaultCultureService.cs" />
     <Compile Include="Culture\ICultureService.cs" />
     <Compile Include="DefaultResponseFormatterFactory.cs" />
+    <Compile Include="DefaultRootPathProvider.cs" />
     <Compile Include="DefaultStaticContentProvider.cs" />
     <Compile Include="Diagnostics\DiagnosticsConfiguration.cs" />
     <Compile Include="Diagnostics\DiagnosticsSession.cs" />
@@ -268,6 +269,7 @@
     <Compile Include="Routing\Trie\RouteResolverTrie.cs" />
     <Compile Include="Routing\Trie\SegmentMatch.cs" />
     <Compile Include="Routing\Trie\TrieNodeFactory.cs" />
+    <Compile Include="Session\CookieBasedSessionsConfiguration.cs" />
     <Compile Include="StaticContent.cs" />
     <Compile Include="Conventions\ViewLocationConventions.cs" />
     <Compile Include="Cryptography\Base64Helpers.cs" />
