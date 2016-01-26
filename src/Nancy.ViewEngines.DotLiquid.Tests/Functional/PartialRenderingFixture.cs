@@ -1,6 +1,8 @@
 namespace Nancy.ViewEngines.DotLiquid.Tests.Functional
 {
-    using Testing;
+    using System.Threading.Tasks;
+    using Nancy.Testing;
+
     using Xunit;
 
     public class PartialRenderingFixture
@@ -19,11 +21,11 @@ namespace Nancy.ViewEngines.DotLiquid.Tests.Functional
         }
 
         [Fact]
-        public void Should_render_view_with_unquoted_partial()
+        public async Task Should_render_view_with_unquoted_partial()
         {
             // Given
             // When
-            var result = this.browser.Get("/unquotedpartial");
+            var result = await this.browser.Get("/unquotedpartial");
 
             // Then
             Assert.Equal(result.StatusCode, HttpStatusCode.OK);
@@ -31,11 +33,11 @@ namespace Nancy.ViewEngines.DotLiquid.Tests.Functional
         }
 
         [Fact]
-        public void Should_render_view_with_singlequoted_partial()
+        public async Task Should_render_view_with_singlequoted_partial()
         {
             // Given
             // When
-            var result = this.browser.Get("/singlequotedpartial");
+            var result = await this.browser.Get("/singlequotedpartial");
 
             // Then
             Assert.Equal(result.StatusCode, HttpStatusCode.OK);
@@ -43,11 +45,11 @@ namespace Nancy.ViewEngines.DotLiquid.Tests.Functional
         }
 
         [Fact]
-        public void Should_render_view_with_doublequoted_partial()
+        public async Task Should_render_view_with_doublequoted_partial()
         {
             // Given
             // When
-            var result = this.browser.Get("/doublequotedpartial");
+            var result = await this.browser.Get("/doublequotedpartial");
 
             // Then
             Assert.Equal(result.StatusCode, HttpStatusCode.OK);
@@ -55,7 +57,7 @@ namespace Nancy.ViewEngines.DotLiquid.Tests.Functional
         }
     }
 
-    public class PartialRenderingModule : NancyModule
+    public class PartialRenderingModule : LegacyNancyModule
     {
         public PartialRenderingModule()
         {

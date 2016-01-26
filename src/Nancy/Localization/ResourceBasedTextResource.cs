@@ -4,7 +4,6 @@ namespace Nancy.Localization
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using System.Reflection;
     using System.Resources;
 
     /// <summary>
@@ -14,7 +13,7 @@ namespace Nancy.Localization
     {
         private readonly IResourceAssemblyProvider resourceAssemblyProvider;
         private readonly IDictionary<string, ResourceManager> resourceManagers;
-        
+
         /// <summary>
         /// Initializes a new instance of <see cref="ResourceBasedTextResource"/> to read strings from *.resx files
         /// </summary>
@@ -23,7 +22,7 @@ namespace Nancy.Localization
         {
             this.resourceAssemblyProvider = resourceAssemblyProvider;
 
-            var resources = 
+            var resources =
                 from assembly in this.resourceAssemblyProvider.GetAssembliesToScan()
                 from resourceName in assembly.GetManifestResourceNames()
                 where resourceName.EndsWith(".resources")
@@ -35,8 +34,19 @@ namespace Nancy.Localization
                         Manager = new ResourceManager(baseName, assembly)
                     };
 
-            this.resourceManagers = 
-                resources.ToDictionary(x => x.Name, x => x.Manager, StringComparer.OrdinalIgnoreCase);
+            this.resourceManagers = new Dictionary<string, ResourceManager>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var x in resources)
+            {
+                if (!this.resourceManagers.ContainsKey(x.Name))
+                {
+                    this.resourceManagers[x.Name] = x.Manager;
+                }
+                else
+                {
+                    throw new ArgumentException(string.Format("Key '{0}' already exists;",x.Name));
+                }
+            }
         }
 
         /// <summary>
@@ -54,7 +64,7 @@ namespace Nancy.Localization
 
                 var candidates =
                     this.resourceManagers.Where(
-                        x => x.Key.EndsWith(components.Item1, StringComparison.OrdinalIgnoreCase)).ToArray();
+                        x => x.Key.EndsWith("." + components.Item1, StringComparison.OrdinalIgnoreCase)).ToArray();
 
                 if (candidates.Count() > 1)
                 {
@@ -72,7 +82,7 @@ namespace Nancy.Localization
         private static Tuple<string, string> GetKeyComponents(string key)
         {
             var index =
-                key.LastIndexOf(".", StringComparison.InvariantCulture);
+                key.LastIndexOf(".", StringComparison.Ordinal);
 
             if (index == -1)
             {

@@ -12,11 +12,11 @@
         private readonly ISerializer serializer;
 
         private static readonly IEnumerable<Tuple<string, MediaRange>> extensionMappings =
-            new[] { new Tuple<string, MediaRange>("xml", MediaRange.FromString("application/xml")) };
+            new[] { new Tuple<string, MediaRange>("xml", new MediaRange("application/xml")) };
 
         /// <summary>
         /// Initializes a new instance of the <see cref="XmlProcessor"/> class,
-        /// with the provided <see cref="serializers"/>.
+        /// with the provided <see paramref="serializers"/>.
         /// </summary>
         /// <param name="serializers">The serializes that the processor will use to process the request.</param>
         public XmlProcessor(IEnumerable<ISerializer> serializers)
@@ -34,7 +34,7 @@
         }
 
         /// <summary>
-        /// Determines whether the the processor can handle a given content type and model.
+        /// Determines whether the processor can handle a given content type and model.
         /// </summary>
         /// <param name="requestedMediaRange">Content type requested by the client.</param>
         /// <param name="model">The model for the given media range.</param>
@@ -83,7 +83,13 @@
         {
             return new Response
             {
-                Contents = stream => serializer.Serialize("application/xml", model, stream),
+                Contents = stream =>
+                {
+                    if (model != null)
+                    {
+                        serializer.Serialize("application/xml", model, stream);
+                    }
+                },
                 ContentType = "application/xml",
                 StatusCode = HttpStatusCode.OK
             };
@@ -101,7 +107,7 @@
 
         private static bool IsWildcardXmlContentType(MediaRange requestedContentType)
         {
-            if (!requestedContentType.Type.IsWildcard && !string.Equals("application", requestedContentType.Type, StringComparison.InvariantCultureIgnoreCase))
+            if (!requestedContentType.Type.IsWildcard && !string.Equals("application", requestedContentType.Type, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
@@ -113,8 +119,8 @@
 
             var subtypeString = requestedContentType.Subtype.ToString();
 
-            return (subtypeString.StartsWith("vnd", StringComparison.InvariantCultureIgnoreCase) &&
-                    subtypeString.EndsWith("+xml", StringComparison.InvariantCultureIgnoreCase));
+            return (subtypeString.StartsWith("vnd", StringComparison.OrdinalIgnoreCase) &&
+                    subtypeString.EndsWith("+xml", StringComparison.OrdinalIgnoreCase));
         }
     }
 }

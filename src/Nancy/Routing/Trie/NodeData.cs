@@ -2,8 +2,6 @@ namespace Nancy.Routing.Trie
 {
     using System;
 
-    using Nancy;
-
     /// <summary>
     /// Represents a route that ends at a particular node.
     /// We store/calculate as much as we can at build time to save
@@ -27,7 +25,7 @@ namespace Nancy.Routing.Trie
         public int RouteIndex { get; set; }
 
         /// <summary>
-        /// Gets or sets the numer of segments in the route
+        /// Gets or sets the number of segments in the route
         /// </summary>
         public int RouteLength { get; set; }
 

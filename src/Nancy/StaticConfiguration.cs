@@ -3,44 +3,19 @@ namespace Nancy
     using System;
     using System.Diagnostics;
     using System.Linq;
-    using Diagnostics;
     using Nancy.Bootstrapper;
+    using Nancy.Diagnostics;
 
     public static class StaticConfiguration
     {
         private static bool? isRunningDebug;
-        private static bool? disableCaches;
-
-        private static bool? disableErrorTraces;
 
         static StaticConfiguration()
         {
-            disableErrorTraces = !(disableCaches = IsRunningDebug);
             CaseSensitive = false;
             RequestQueryFormMultipartLimit = 1000;
+            AllowFileStreamUploadAsync = true;
         }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether or not to disable traces in error messages
-        /// </summary>
-        [Description("Disables trace output in the default 500 error pages.")]
-        public static bool DisableErrorTraces
-        {
-            get
-            {
-                return disableErrorTraces ?? (bool)(disableErrorTraces = IsRunningDebug);
-            }
-            set
-            {
-                disableErrorTraces = value;
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether or not to respond with 405 responses
-        /// </summary>
-        [Description("Disables 405 responses from being sent to the client.")]
-        public static bool DisableMethodNotAllowedResponses { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether or not to enable case sensitivity in query, parameters (DynamicDictionary) and model binding. Enable this to conform with RFC3986.
@@ -89,50 +64,15 @@ namespace Nancy
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether or not to enable request tracing
+        /// Gets or sets a value indicating whether or not to disable request stream switching
         /// </summary>
-        [Description("Enable request tracing.")]
-        public static bool EnableRequestTracing { get; set; }
+        public static bool? DisableRequestStreamSwitching { get; set; }
 
-        public static class Caching
-        {
-            private static bool? enableRuntimeViewDiscovery;
-
-            private static bool? enableRuntimeViewUpdates;
-
-            /// <summary>
-            /// Gets or sets a value indicating whether or not to enable runtime view discovery
-            /// Defaults to True in debug mode and False in release mode
-            /// </summary>
-            [Description("Enable runtime discovery of new views.")]
-            public static bool EnableRuntimeViewDiscovery
-            {
-                get
-                {
-                    return enableRuntimeViewDiscovery ?? (bool)(enableRuntimeViewDiscovery = IsRunningDebug);
-                }
-                set
-                {
-                    enableRuntimeViewDiscovery = value;
-                }
-            }
-
-            /// <summary>
-            /// Gets or sets a value indicating whether or not to allow runtime changes of views
-            /// Defaults to True in debug mode and False in release mode
-            /// </summary>
-            [Description("Enable runtime updating of view templates.")]
-            public static bool EnableRuntimeViewUpdates
-            {
-                get
-                {
-                    return enableRuntimeViewUpdates ?? (bool)(enableRuntimeViewUpdates = IsRunningDebug);
-                }
-                set
-                {
-                    enableRuntimeViewUpdates = value;
-                }
-            }
-        }
+        /// <summary>
+        /// Gets or sets a value indicating whether this <see cref="Nancy.StaticConfiguration"/> allow file stream
+        /// upload async due to mono issues before v4.  Uploads of over 80mb would result in extra padded chars to the filestream corrupting the file.
+        /// </summary>
+        /// <value><c>true</c> if allow file stream upload async; otherwise, <c>false</c>.</value>
+        public static bool AllowFileStreamUploadAsync { get; set; }
     }
 }

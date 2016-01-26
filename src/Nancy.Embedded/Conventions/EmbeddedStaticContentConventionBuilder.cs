@@ -6,8 +6,9 @@
     using System.Linq;
     using System.Reflection;
     using System.Text.RegularExpressions;
-    using Helpers;
-    using Responses;
+
+    using Nancy.Helpers;
+    using Nancy.Responses;
 
     public class EmbeddedStaticContentConventionBuilder
     {
@@ -32,7 +33,7 @@
             {
                 requestedPath = string.Concat("/", requestedPath);
             }
-                
+
             return (ctx, root) =>
             {
                 var path =

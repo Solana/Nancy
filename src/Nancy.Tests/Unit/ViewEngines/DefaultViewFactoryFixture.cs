@@ -3,13 +3,16 @@ namespace Nancy.Tests.Unit.ViewEngines
     using System;
     using System.Dynamic;
     using System.IO;
-    using FakeItEasy;
-    using Nancy.ViewEngines;
-    using Nancy.Tests.Fakes;
-    using Xunit;
     using System.Linq;
-    using Nancy.Conventions;
 
+    using FakeItEasy;
+
+    using Nancy.Conventions;
+    using Nancy.Diagnostics;
+    using Nancy.Tests.Fakes;
+    using Nancy.ViewEngines;
+
+    using Xunit;
 
     public class DefaultViewFactoryFixture
     {
@@ -31,7 +34,13 @@ namespace Nancy.Tests.Unit.ViewEngines
             this.viewLocationContext =
                 new ViewLocationContext
                 {
-                    Context = new NancyContext()
+                    Context = new NancyContext
+                    {
+                        Trace = new DefaultRequestTrace
+                        {
+                            TraceLog = new DefaultTraceLog()
+                        }
+                    }
                 };
         }
 
@@ -190,7 +199,13 @@ namespace Nancy.Tests.Unit.ViewEngines
             var viewContext = 
                 new ViewLocationContext
                 {
-                    Context = new NancyContext(),
+                    Context = new NancyContext
+                    {
+                        Trace = new DefaultRequestTrace
+                        {
+                            TraceLog = new DefaultTraceLog()
+                        }
+                    },
                     ModulePath = "/bar"
                 };
 

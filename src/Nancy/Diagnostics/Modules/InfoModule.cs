@@ -7,25 +7,28 @@
     using System.Linq;
     using System.Reflection;
     using Nancy.Bootstrapper;
+    using Nancy.Configuration;
     using Nancy.ViewEngines;
 
     public class InfoModule : DiagnosticModule
     {
-        public InfoModule(IRootPathProvider rootPathProvider, NancyInternalConfiguration configuration)
+        public InfoModule(IRootPathProvider rootPathProvider, NancyInternalConfiguration configuration, INancyEnvironment environment)
             : base("/info")
         {
-            Get["/"] = _ =>
+            Get["/"] = async (_, __) =>
             {
                 return View["Info"];
             };
 
-            Get["/data"] = _ =>
+            Get["/data"] = async (_, __) =>
             {
                 dynamic data = new ExpandoObject();
 
+
+
                 data.Nancy = new ExpandoObject();
                 data.Nancy.Version = string.Format("v{0}", this.GetType().Assembly.GetName().Version.ToString());
-                data.Nancy.TracesDisabled = StaticConfiguration.DisableErrorTraces;
+                data.Nancy.TracesDisabled = !environment.GetValue<TraceConfiguration>().DisplayErrorTraces;
                 data.Nancy.CaseSensitivity = StaticConfiguration.CaseSensitive ? "Sensitive" : "Insensitive";
                 data.Nancy.RootPath = rootPathProvider.GetRootPath();
                 data.Nancy.Hosting = GetHosting();
@@ -78,7 +81,7 @@
                 .FirstOrDefault(asmName => asmName.Name != null && asmName.Name.StartsWith("Nancy.Hosting."));
 
             return (name == null) ?
-                "Unknown" : 
+                "Unknown" :
                 string.Format("{0} (v{1})", name.Name.Split('.').Last(), name.Version);
         }
     }

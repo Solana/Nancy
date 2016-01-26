@@ -1,9 +1,11 @@
 ﻿namespace Nancy.Tests.Functional.Tests
 {
     using System;
-    using Bootstrapper;
-    using Modules;
-    using Testing;
+    using System.Threading.Tasks;
+    using Nancy.Bootstrapper;
+    using Nancy.Testing;
+    using Nancy.Tests.Functional.Modules;
+
     using Xunit;
 
     public class TracingSmokeTests
@@ -21,11 +23,11 @@
         }
 
         [Fact]
-        public void Should_render_content_from_viewbag()
+        public async Task Should_render_content_from_viewbag()
         {
             // Given
             // When
-            var response = browser.Get(
+            var response = await browser.Get(
                 @"/tracing/razor-viewbag",
                 with =>
                 {

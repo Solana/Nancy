@@ -1,6 +1,5 @@
 ﻿namespace Nancy.Hosting.Self
 {
-    using System;
     using System.Diagnostics;
 
     /// <summary>
@@ -13,7 +12,7 @@
         /// </summary>
         /// <param name="file">File to execute</param>
         /// <param name="args">Arguments to pass to the executable</param>
-        /// <returns>True if sucessful, false otherwise</returns>
+        /// <returns>True if successful, false otherwise</returns>
         public static bool RunElevated(string file, string args)
         {
             var process = CreateProcess(args, file);

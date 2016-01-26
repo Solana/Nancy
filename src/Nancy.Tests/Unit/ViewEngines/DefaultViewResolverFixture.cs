@@ -3,10 +3,13 @@
     using System;
     using System.IO;
     using System.Linq;
+
     using FakeItEasy;
 
     using Nancy.Conventions;
+    using Nancy.Diagnostics;
     using Nancy.ViewEngines;
+
     using Xunit;
 
     public class DefaultViewResolverFixture
@@ -23,7 +26,13 @@
             this.viewLocationContext =
                 new ViewLocationContext
                 {
-                    Context = new NancyContext()
+                    Context = new NancyContext
+                    {
+                        Trace = new DefaultRequestTrace
+                        {
+                            TraceLog = new DefaultTraceLog()
+                        }
+                    }
                 };
         }
 

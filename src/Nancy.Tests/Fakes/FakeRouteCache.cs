@@ -1,10 +1,9 @@
 ﻿namespace Nancy.Tests.Fakes
 {
     using System;
-    using System.Collections;
     using System.Collections.Generic;
-    using System.ComponentModel;
     using System.Linq;
+
     using Nancy.Routing;
 
     public class FakeRouteCache : Dictionary<Type, List<Tuple<int, RouteDescription>>>, IRouteCache
@@ -49,14 +48,14 @@
 
             public FakeRouteCacheConfigurator AddGetRoute(string path, Type moduleType)
             {
-                this.AddRoutesToCache(new[] { new RouteDescription("GET", path, null) }, moduleType);
+                this.AddRoutesToCache(new[] { new RouteDescription(string.Empty, "GET", path, null) }, moduleType);
 
                 return this;
             }
 
             public FakeRouteCacheConfigurator AddGetRoute(string path, Type moduleType, Func<NancyContext, bool> condition)
             {
-                this.AddRoutesToCache(new[] { new RouteDescription("GET", path, condition) }, moduleType);
+                this.AddRoutesToCache(new[] { new RouteDescription(string.Empty, "GET", path, condition) }, moduleType);
 
                 return this;
             }

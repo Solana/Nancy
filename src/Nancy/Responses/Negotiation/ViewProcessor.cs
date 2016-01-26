@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Generic;
+    using Nancy.Configuration;
     using Nancy.ViewEngines;
 
     /// <summary>
@@ -10,15 +11,18 @@
     public class ViewProcessor : IResponseProcessor
     {
         private readonly IViewFactory viewFactory;
+        private readonly TraceConfiguration traceConfiguration;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ViewProcessor"/> class,
         /// with the provided <paramref name="viewFactory"/>.
         /// </summary>
         /// <param name="viewFactory">The view factory that should be used to render views.</param>
-        public ViewProcessor(IViewFactory viewFactory)
+        /// <param name="environment">An <see cref="INancyEnvironment"/> instance.</param>
+        public ViewProcessor(IViewFactory viewFactory, INancyEnvironment environment)
         {
             this.viewFactory = viewFactory;
+            this.traceConfiguration = environment.GetValue<TraceConfiguration>();
         }
 
         /// <summary>
@@ -31,7 +35,7 @@
         }
 
         /// <summary>
-        /// Determines whether the the processor can handle a given content type and model.
+        /// Determines whether the processor can handle a given content type and model.
         /// </summary>
         /// <param name="requestedMediaRange">Content type requested by the client.</param>
         /// <param name="model">The model for the given media range.</param>
@@ -39,11 +43,11 @@
         /// <returns>A <see cref="ProcessorMatch"/> result that determines the priority of the processor.</returns>
         public ProcessorMatch CanProcess(MediaRange requestedMediaRange, dynamic model, NancyContext context)
         {
-            var matchingContentType = 
+            var matchingContentType =
                 requestedMediaRange.Matches("text/html");
 
-            return matchingContentType 
-                ? new ProcessorMatch { ModelResult = MatchResult.DontCare, RequestedContentTypeResult = MatchResult.ExactMatch } 
+            return matchingContentType
+                ? new ProcessorMatch { ModelResult = MatchResult.DontCare, RequestedContentTypeResult = MatchResult.ExactMatch }
                 : new ProcessorMatch();
         }
 
@@ -56,7 +60,11 @@
         /// <returns>A <see cref="Response"/> instance.</returns>
         public Response Process(MediaRange requestedMediaRange, dynamic model, NancyContext context)
         {
-            return this.viewFactory.RenderView(context.NegotiationContext.ViewName, model, GetViewLocationContext(context));
+            var viewResponse = this.viewFactory.RenderView(context.NegotiationContext.ViewName, model, GetViewLocationContext(context));
+
+            return this.traceConfiguration.DisplayErrorTraces
+                ? new MaterialisingResponse(viewResponse)
+                : viewResponse;
         }
 
         private static ViewLocationContext GetViewLocationContext(NancyContext context)

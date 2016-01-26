@@ -6,7 +6,6 @@
     using System.Globalization;
     using System.Web.Compilation;
     using System.Web.Razor;
-    using Nancy.ViewEngines.Razor;
 
     [BuildProviderAppliesTo(BuildProviderAppliesTo.Code | BuildProviderAppliesTo.Web)]
     public class NancyCSharpRazorBuildProvider : BuildProvider
@@ -43,7 +42,7 @@
         public override void GenerateCode(AssemblyBuilder assemblyBuilder)
         {
             assemblyBuilder.AddCodeCompileUnit(this, this.GetGeneratedCode());
-            
+
             assemblyBuilder.GenerateTypeFactory(string.Format(CultureInfo.InvariantCulture, "{0}.{1}", new object[] { this.host.DefaultNamespace, this.host.DefaultClassName }));
         }
 

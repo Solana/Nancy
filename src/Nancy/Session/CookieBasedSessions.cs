@@ -4,9 +4,10 @@ namespace Nancy.Session
     using System.Collections.Generic;
     using System.Linq;
     using System.Text;
-    using Bootstrapper;
-    using Cryptography;
+
+    using Nancy.Bootstrapper;
     using Nancy.Cookies;
+    using Nancy.Cryptography;
     using Nancy.Helpers;
 
     /// <summary>
@@ -64,7 +65,7 @@ namespace Nancy.Session
 
 
         /// <summary>
-        /// Initialise and add cookie based session hooks to the application pipeine
+        /// Initialise and add cookie based session hooks to the application pipeline
         /// </summary>
         /// <param name="pipelines">Application pipelines</param>
         /// <param name="configuration">Cookie based sessions configuration.</param>
@@ -85,7 +86,7 @@ namespace Nancy.Session
         }
 
         /// <summary>
-        /// Initialise and add cookie based session hooks to the application pipeine
+        /// Initialise and add cookie based session hooks to the application pipeline
         /// </summary>
         /// <param name="pipelines">Application pipelines</param>
         /// <param name="cryptographyConfiguration">Cryptography configuration</param>
@@ -100,7 +101,7 @@ namespace Nancy.Session
         }
 
         /// <summary>
-        /// Initialise and add cookie based session hooks to the application pipeine with the default encryption provider.
+        /// Initialise and add cookie based session hooks to the application pipeline with the default encryption provider.
         /// </summary>
         /// <param name="pipelines">Application pipelines</param>
         /// <returns>Formatter selector for choosing a non-default serializer</returns>
@@ -148,7 +149,7 @@ namespace Nancy.Session
             var cryptographyConfiguration = this.currentConfiguration.CryptographyConfiguration;
             var encryptedData = cryptographyConfiguration.EncryptionProvider.Encrypt(sb.ToString());
             var hmacBytes = cryptographyConfiguration.HmacProvider.GenerateHmac(encryptedData);
-            var cookieData = String.Format("{0}{1}", Convert.ToBase64String(hmacBytes), encryptedData);
+            var cookieData = HttpUtility.UrlEncode(String.Format("{0}{1}", Convert.ToBase64String(hmacBytes), encryptedData));
 
             var cookie = new NancyCookie(this.currentConfiguration.CookieName, cookieData, true)
             {
@@ -175,6 +176,11 @@ namespace Nancy.Session
             {
                 var cookieData = HttpUtility.UrlDecode(request.Cookies[cookieName]);
                 var hmacLength = Base64Helpers.GetBase64Length(hmacProvider.HmacLength);
+                if (cookieData.Length < hmacLength)
+                {
+                  return new Session(dictionary);
+                }
+
                 var hmacString = cookieData.Substring(0, hmacLength);
                 var encryptedCookie = cookieData.Substring(hmacLength);
 
@@ -184,7 +190,7 @@ namespace Nancy.Session
 
                 var data = encryptionProvider.Decrypt(encryptedCookie);
                 var parts = data.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var part in parts.Select(part => part.Split('=')))
+                foreach (var part in parts.Select(part => part.Split('=')).Where(part => part.Length == 2))
                 {
                     var valueObject = this.currentConfiguration.Serializer.Deserialize(HttpUtility.UrlDecode(part[1]));
 

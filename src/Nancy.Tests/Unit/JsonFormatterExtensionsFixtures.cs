@@ -2,10 +2,13 @@ namespace Nancy.Tests.Unit
 {
     using System.IO;
     using System.Text;
-    using FakeItEasy;
 
+    using FakeItEasy;
+    using Nancy.Configuration;
+    using Nancy.Json;
     using Nancy.Responses;
     using Nancy.Tests.Fakes;
+
     using Xunit;
 
     public class JsonFormatterExtensionsFixtures
@@ -16,8 +19,13 @@ namespace Nancy.Tests.Unit
 
         public JsonFormatterExtensionsFixtures()
         {
+            var environment = GetTestingEnvironment();
+            var serializerFactory =
+               new DefaultSerializerFactory(new ISerializer[] { new DefaultJsonSerializer(environment) });
+
             this.formatter = A.Fake<IResponseFormatter>();
-            A.CallTo(() => this.formatter.Serializers).Returns(new[] { new DefaultJsonSerializer() });
+            A.CallTo(() => this.formatter.Environment).Returns(environment);
+            A.CallTo(() => this.formatter.SerializerFactory).Returns(serializerFactory);
             this.model = new Person { FirstName = "Andy", LastName = "Pike" };
             this.response = this.formatter.AsJson(model);
         }
@@ -52,26 +60,40 @@ namespace Nancy.Tests.Unit
             using (var stream = new MemoryStream())
             {
                 nullResponse.Contents(stream);
-                Encoding.UTF8.GetString(stream.ToArray()).ShouldEqual("null");
+                Encoding.UTF8.GetString(stream.ToArray()).ShouldHaveCount(0);
             }
         }
 
-		[Fact]
-		public void Json_formatter_can_deserialize_objects_of_type_Type()
-		{
-			var response = formatter.AsJson(new {type = typeof (string)});
-			using (var stream = new MemoryStream())
-			{
-				response.Contents(stream);
-				Encoding.UTF8.GetString(stream.ToArray()).ShouldEqual(@"{""type"":""System.String""}");
-			}
-		}
+        [Fact]
+        public void Json_formatter_can_deserialize_objects_of_type_Type()
+        {
+            var response = formatter.AsJson(new { type = typeof(string) });
+            using (var stream = new MemoryStream())
+            {
+                response.Contents(stream);
+                Encoding.UTF8.GetString(stream.ToArray()).ShouldEqual(@"{""type"":""System.String""}");
+            }
+        }
 
-		[Fact]
-		public void Can_set_status_on_json_response()
-		{
-			var response = formatter.AsJson(new {foo = "bar"}, HttpStatusCode.InternalServerError);
-			Assert.Equal(response.StatusCode, HttpStatusCode.InternalServerError);
-		}
+        [Fact]
+        public void Can_set_status_on_json_response()
+        {
+            var response = formatter.AsJson(new { foo = "bar" }, HttpStatusCode.InternalServerError);
+            Assert.Equal(response.StatusCode, HttpStatusCode.InternalServerError);
+        }
+
+        private static INancyEnvironment GetTestingEnvironment()
+        {
+            var envionment =
+                new DefaultNancyEnvironment();
+
+            envionment.AddValue(JsonConfiguration.Default);
+
+            envionment.Tracing(
+                enabled: true,
+                displayErrorTraces: true);
+
+            return envionment;
+        }
     }
 }

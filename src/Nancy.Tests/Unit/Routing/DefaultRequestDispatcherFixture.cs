@@ -7,11 +7,12 @@ namespace Nancy.Tests.Unit.Routing
     using System.Threading.Tasks;
 
     using FakeItEasy;
-    using Fakes;
 
     using Nancy.Helpers;
     using Nancy.Responses.Negotiation;
     using Nancy.Routing;
+    using Nancy.Tests.Fakes;
+    using Nancy.Tests.xUnitExtensions;
     using Xunit;
 
     public class DefaultRequestDispatcherFixture
@@ -20,33 +21,25 @@ namespace Nancy.Tests.Unit.Routing
         private readonly IRouteResolver routeResolver;
         private readonly IRouteInvoker routeInvoker;
         private readonly IList<IResponseProcessor> responseProcessors;
+        private IResponseNegotiator negotiator;
 
         public DefaultRequestDispatcherFixture()
         {
             this.responseProcessors = new List<IResponseProcessor>();
             this.routeResolver = A.Fake<IRouteResolver>();
             this.routeInvoker = A.Fake<IRouteInvoker>();
+            this.negotiator = A.Fake<IResponseNegotiator>();
 
-            A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<CancellationToken>._, A<DynamicDictionary>._, A<NancyContext>._)).ReturnsLazily(arg =>
+            A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<CancellationToken>._, A<DynamicDictionary>._, A<NancyContext>._))
+                .ReturnsLazily(async arg =>
                 {
-                    var tcs = new TaskCompletionSource<Response>();
+                    var actionResult = await ((Route)arg.Arguments[0]).Action.Invoke(arg.Arguments[2], new CancellationToken());
 
-                    var actionResult =
-                        ((Route)arg.Arguments[0]).Action.Invoke(arg.Arguments[2], new CancellationToken());
-
-                    if (actionResult.IsFaulted)
-                    {
-                        tcs.SetException(actionResult.Exception.InnerException);
-                    }
-                    else
-                    {
-                        tcs.SetResult(actionResult.Result);
-                    }
-                    return tcs.Task;
+                    return actionResult;
                 });
 
             this.requestDispatcher =
-                new DefaultRequestDispatcher(this.routeResolver, this.responseProcessors, this.routeInvoker);
+                new DefaultRequestDispatcher(this.routeResolver, this.responseProcessors, this.routeInvoker, this.negotiator);
 
             var resolvedRoute = new ResolveResult
             {
@@ -61,7 +54,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_invoke_module_before_hook_followed_by_resolved_route_followed_by_module_after_hook()
+        public async Task Should_invoke_module_before_hook_followed_by_resolved_route_followed_by_module_after_hook()
         {
             // Given
             var capturedExecutionOrder = new List<string>();
@@ -104,7 +97,7 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             capturedExecutionOrder.Count().ShouldEqual(3);
@@ -112,7 +105,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_not_invoke_resolved_route_if_module_before_hook_returns_response_but_should_invoke_module_after_hook()
+        public async Task Should_not_invoke_resolved_route_if_module_before_hook_returns_response_but_should_invoke_module_after_hook()
         {
             // Given
             var capturedExecutionOrder = new List<string>();
@@ -150,7 +143,7 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             capturedExecutionOrder.Count().ShouldEqual(2);
@@ -158,7 +151,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_return_response_from_module_before_hook_when_not_null()
+        public async Task Should_return_response_from_module_before_hook_when_not_null()
         {
             // Given
             var expectedResponse = new Response();
@@ -185,14 +178,14 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             context.Response.ShouldBeSameAs(expectedResponse);
         }
 
         [Fact]
-        public void Should_allow_module_after_hook_to_change_response()
+        public async Task Should_allow_module_after_hook_to_change_response()
         {
             // Given
             var before = new BeforePipeline();
@@ -223,14 +216,14 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             context.Response.ShouldBeSameAs(response);
         }
 
         [Fact]
-        public void HandleRequest_should_allow_module_after_hook_to_add_items_to_context()
+        public async Task HandleRequest_should_allow_module_after_hook_to_add_items_to_context()
         {
             // Given
             var route = new FakeRoute();
@@ -254,14 +247,14 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             context.Items.ContainsKey("RoutePostReq").ShouldBeTrue();
         }
 
         [Fact]
-        public void Should_set_the_route_parameters_from_resolved_route()
+        public async Task Should_set_the_route_parameters_from_resolved_route()
         {
             // Given
             const string expectedPath = "/the/path";
@@ -284,14 +277,14 @@ namespace Nancy.Tests.Unit.Routing
             A.CallTo(() => this.routeResolver.Resolve(context)).Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             ((DynamicDictionary)context.Parameters).ShouldBeSameAs(parameters);
         }
 
         [Fact]
-        public void Should_set_the_context_resolved_route_from_resolve_result()
+        public async Task Should_set_the_context_resolved_route_from_resolve_result()
         {
             // Given
             const string expectedPath = "/the/path";
@@ -314,14 +307,14 @@ namespace Nancy.Tests.Unit.Routing
             A.CallTo(() => this.routeResolver.Resolve(context)).Returns(resolveResult);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             context.ResolvedRoute.ShouldBeSameAs(expectedRoute);
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_context_for_current_request()
+        public async Task Should_invoke_route_resolver_with_context_for_current_request()
         {
             // Given
             var context =
@@ -331,14 +324,14 @@ namespace Nancy.Tests.Unit.Routing
                 };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             A.CallTo(() => this.routeResolver.Resolve(context)).MustHaveHappened(Repeated.Exactly.Once);
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_path_when_path_does_not_contain_file_extension()
+        public async Task Should_invoke_route_resolver_with_path_when_path_does_not_contain_file_extension()
         {
             // Given
             const string expectedPath = "/the/path";
@@ -362,14 +355,14 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             requestedPath.ShouldEqual(expectedPath);
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_passed_in_accept_headers_when_path_does_not_contain_file_extensions()
+        public async Task Should_invoke_route_resolver_with_passed_in_accept_headers_when_path_does_not_contain_file_extensions()
         {
             // Given
             var expectedAcceptHeaders = new List<Tuple<string, decimal>>
@@ -401,7 +394,7 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             requestedAcceptHeaders.ShouldHaveCount(2);
@@ -412,7 +405,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_extension_stripped_from_path_when_path_does_contain_file_extension_and_mapped_response_processor_exists()
+        public async Task Should_invoke_route_resolver_with_extension_stripped_from_path_when_path_does_contain_file_extension_and_mapped_response_processor_exists()
         {
             // Given
             var requestedPath = string.Empty;
@@ -447,14 +440,56 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             requestedPath.ShouldEqual("/user");
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_path_containing_when_path_does_contain_file_extension_and_no_mapped_response_processor_exists()
+        public async Task Should_invoke_route_resolver_with_extension_stripped_only_at_the_end_from_path_when_path_does_contain_file_extension_and_mapped_response_processor_exists()
+        {
+            // Given
+            var requestedPath = string.Empty;
+
+            var context =
+                new NancyContext
+                {
+                    Request = new FakeRequest("GET", "/directory.jsonfiles/user.json")
+                };
+
+            var processor =
+                A.Fake<IResponseProcessor>();
+
+            this.responseProcessors.Add(processor);
+
+            var mappings = new List<Tuple<string, MediaRange>>
+            {
+                { new Tuple<string, MediaRange>("json", "application/json") }
+            };
+
+            A.CallTo(() => processor.ExtensionMappings).Returns(mappings);
+
+            var resolvedRoute = new ResolveResult(
+               new FakeRoute(),
+               DynamicDictionary.Empty,
+               null,
+               null,
+               null);
+
+            A.CallTo(() => this.routeResolver.Resolve(context))
+                .Invokes(x => requestedPath = ((NancyContext)x.Arguments[0]).Request.Path)
+                .Returns(resolvedRoute);
+
+            // When
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
+
+            // Then
+            requestedPath.ShouldEqual("/directory.jsonfiles/user");
+        }
+
+        [Fact]
+        public async Task Should_invoke_route_resolver_with_path_containing_when_path_does_contain_file_extension_and_no_mapped_response_processor_exists()
         {
             // Given
             var requestedPath = string.Empty;
@@ -477,14 +512,14 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             requestedPath.ShouldEqual("/user.json");
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_distinct_mapped_media_ranged_when_path_contains_extension_and_mapped_response_processors_exists()
+        public async Task Should_invoke_route_resolver_with_distinct_mapped_media_ranged_when_path_contains_extension_and_mapped_response_processors_exists()
         {
             // Given
             var requestedAcceptHeaders =
@@ -531,7 +566,7 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             requestedAcceptHeaders.ShouldHaveCount(1);
@@ -539,7 +574,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_set_quality_to_high_for_mapped_media_ranges_before_invoking_route_resolver_when_path_contains_extension_and_mapped_response_processors_exists()
+        public async Task Should_set_quality_to_high_for_mapped_media_ranges_before_invoking_route_resolver_when_path_contains_extension_and_mapped_response_processors_exists()
         {
             // Given
             var requestedAcceptHeaders =
@@ -573,7 +608,7 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             requestedAcceptHeaders.ShouldHaveCount(1);
@@ -581,7 +616,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_call_route_invoker_with_resolved_route()
+        public async Task Should_call_route_invoker_with_resolved_route()
         {
             // Given
             var context =
@@ -600,14 +635,14 @@ namespace Nancy.Tests.Unit.Routing
             A.CallTo(() => this.routeResolver.Resolve(context)).Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             A.CallTo(() => this.routeInvoker.Invoke(resolvedRoute.Route, A<CancellationToken>._, A<DynamicDictionary>._, A<NancyContext>._)).MustHaveHappened(Repeated.Exactly.Once);
         }
 
         [Fact]
-        public void Should_invoke_route_resolver_with_path_containing_extension_when_mapped_response_processor_existed_but_no_route_match_was_found()
+        public async Task Should_invoke_route_resolver_with_path_containing_extension_when_mapped_response_processor_existed_but_no_route_match_was_found()
         {
             // Given
             var requestedAcceptHeaders =
@@ -641,14 +676,14 @@ namespace Nancy.Tests.Unit.Routing
                 .Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
-            // Then            
+            // Then
             A.CallTo(() => this.routeResolver.Resolve(A<NancyContext>._)).MustHaveHappened(Repeated.Exactly.Twice);
         }
 
         [Fact]
-        public void Should_call_route_invoker_with_captured_parameters()
+        public async Task Should_call_route_invoker_with_captured_parameters()
         {
             // Given
             var context =
@@ -669,14 +704,14 @@ namespace Nancy.Tests.Unit.Routing
             A.CallTo(() => this.routeResolver.Resolve(context)).Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<CancellationToken>._, parameters, A<NancyContext>._)).MustHaveHappened(Repeated.Exactly.Once);
         }
 
         [Fact]
-        public void Should_call_route_invoker_with_context()
+        public async Task Should_call_route_invoker_with_context()
         {
             // Given
             var context =
@@ -695,14 +730,14 @@ namespace Nancy.Tests.Unit.Routing
             A.CallTo(() => this.routeResolver.Resolve(context)).Returns(resolvedRoute);
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<CancellationToken>._, A<DynamicDictionary>._, context)).MustHaveHappened(Repeated.Exactly.Once);
         }
 
         [Fact]
-        public void Should_invoke_module_onerror_hook_when_module_before_hook_throws_exception()
+        public async Task Should_invoke_module_onerror_hook_when_module_before_hook_throws_exception()
         {
             // Given
             var capturedExecutionOrder = new List<string>();
@@ -737,7 +772,7 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             capturedExecutionOrder.Count().ShouldEqual(2);
@@ -745,7 +780,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_invoke_module_onerror_hook_when_route_invoker_throws_exception()
+        public async Task Should_invoke_module_onerror_hook_when_route_invoker_throws_exception()
         {
             // Given
             var capturedExecutionOrder = new List<string>();
@@ -779,7 +814,7 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             capturedExecutionOrder.Count().ShouldEqual(2);
@@ -787,7 +822,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_invoke_module_onerror_hook_when_module_after_hook_throws_exception()
+        public async Task Should_invoke_module_onerror_hook_when_module_after_hook_throws_exception()
         {
             // Given
             var capturedExecutionOrder = new List<string>();
@@ -821,7 +856,7 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             // When
-            this.requestDispatcher.Dispatch(context, new CancellationToken());
+            await this.requestDispatcher.Dispatch(context, new CancellationToken());
 
             // Then
             capturedExecutionOrder.Count().ShouldEqual(2);
@@ -829,7 +864,7 @@ namespace Nancy.Tests.Unit.Routing
         }
 
         [Fact]
-        public void Should_rethrow_exception_when_onerror_hook_does_return_response()
+        public async Task Should_rethrow_exception_when_onerror_hook_does_return_response()
         {
             // Given
             var route = new FakeRoute
@@ -848,7 +883,7 @@ namespace Nancy.Tests.Unit.Routing
                 DynamicDictionary.Empty,
                 before,
                 after,
-                (ctx, ex) => { return null; });
+                (ctx, ex) => null);
 
             A.CallTo(() => this.routeResolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
@@ -856,13 +891,14 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             //When
+            var exception = await RecordAsync.Exception(async () => await this.requestDispatcher.Dispatch(context, new CancellationToken()));
 
             // Then
-            Assert.Throws<Exception>(() => this.requestDispatcher.Dispatch(context, new CancellationToken()));
+            exception.ShouldNotBeNull();
         }
 
         [Fact]
-        public void Should_not_rethrow_exception_when_onerror_hook_returns_response()
+        public async Task Should_not_rethrow_exception_when_onerror_hook_returns_response()
         {
             // Given
             var route = new FakeRoute
@@ -889,14 +925,15 @@ namespace Nancy.Tests.Unit.Routing
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
             //When
+            var exception = await RecordAsync.Exception(async () => await this.requestDispatcher.Dispatch(context, new CancellationToken()));
 
             // Then
-            Assert.DoesNotThrow(() => this.requestDispatcher.Dispatch(context, new CancellationToken()));
+            exception.ShouldBeNull();
         }
 
 #if !__MonoCS__
         [Fact]
-        public void should_preserve_stacktrace_when_rethrowing_the_excption()
+        public async Task should_preserve_stacktrace_when_rethrowing_the_excption()
         {
             // Given
             var route = new FakeRoute
@@ -915,14 +952,14 @@ namespace Nancy.Tests.Unit.Routing
                 DynamicDictionary.Empty,
                 before,
                 after,
-                (ctx, ex) => { return null; });
+                (ctx, ex) => null);
 
             A.CallTo(() => this.routeResolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
             var context =
                 new NancyContext { Request = new Request("GET", "/", "http") };
 
-            var exception = Assert.Throws<Exception>(() => this.requestDispatcher.Dispatch(context, new CancellationToken()));
+            var exception = await RecordAsync.Exception(async () => await this.requestDispatcher.Dispatch(context, new CancellationToken()));
 
             exception.StackTrace.ShouldContain("BrokenMethod");
         }

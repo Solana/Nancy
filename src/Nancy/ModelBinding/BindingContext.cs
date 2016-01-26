@@ -2,7 +2,6 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Reflection;
 
     /// <summary>
     /// Model binding context object
@@ -25,7 +24,7 @@
         public Type DestinationType { get; set; }
 
         /// <summary>
-        /// The generic type of a collection is only used when DestinationType is a enumerble.
+        /// The generic type of a collection is only used when DestinationType is a enumerable.
         /// </summary>
         public Type GenericType { get; set; }
 
@@ -37,7 +36,7 @@
         /// <summary>
         /// DestinationType properties that are not black listed
         /// </summary>
-        public IEnumerable<PropertyInfo> ValidModelProperties { get; set; }
+        public IEnumerable<BindingMemberInfo> ValidModelBindingMembers { get; set; }
 
         /// <summary>
         /// The incoming data fields

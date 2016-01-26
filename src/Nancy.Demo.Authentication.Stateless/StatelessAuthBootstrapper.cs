@@ -2,7 +2,6 @@ namespace Nancy.Demo.Authentication.Stateless
 {
     using Nancy.Authentication.Stateless;
     using Nancy.Bootstrapper;
-    using Nancy.Conventions;
     using Nancy.TinyIoc;
 
     public class StatelessAuthBootstrapper : DefaultNancyBootstrapper
@@ -12,13 +11,13 @@ namespace Nancy.Demo.Authentication.Stateless
             // At request startup we modify the request pipelines to
             // include stateless authentication
             //
-            // Configuring stateless authentication is simple. Just use the 
-            // NancyContext to get the apiKey. Then, use the apiKey to get 
+            // Configuring stateless authentication is simple. Just use the
+            // NancyContext to get the apiKey. Then, use the apiKey to get
             // your user's identity.
             var configuration =
                 new StatelessAuthenticationConfiguration(nancyContext =>
                     {
-                        //for now, we will pull the apiKey from the querystring, 
+                        //for now, we will pull the apiKey from the querystring,
                         //but you can pull it from any part of the NancyContext
                         var apiKey = (string) nancyContext.Request.Query.ApiKey.Value;
 

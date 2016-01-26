@@ -2,7 +2,7 @@
 {
     using Nancy.Demo.Hosting.Aspnet.Models;
 
-    public class DependencyModule : NancyModule
+    public class DependencyModule : LegacyNancyModule
     {
         private readonly IApplicationDependency applicationDependency;
         private readonly IRequestDependency requestDependency;
@@ -13,10 +13,10 @@
             this.requestDependency = requestDependency;
 
             Get["/dependency"] = x =>{
-                var model = 
+                var model =
                     new RatPackWithDependencyText
-                    { 
-                        FirstName = "Bob", 
+                    {
+                        FirstName = "Bob",
                         ApplicationDependencyText = this.applicationDependency.GetContent(),
                         RequestDependencyText = this.requestDependency.GetContent()
                     };

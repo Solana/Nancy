@@ -1,8 +1,10 @@
-﻿namespace Nancy.Tests.Unit
+namespace Nancy.Tests.Unit
 {
     using System;
     using System.Linq;
     using System.Threading;
+    using System.Threading.Tasks;
+    using Nancy.Tests.xUnitExtensions;
     using Xunit;
 
     public class AfterPipelineFixture
@@ -45,7 +47,7 @@
         }
 
         [Fact]
-        public void When_cast_to_func_and_invoked_members_are_invoked()
+        public async Task When_cast_to_func_and_invoked_members_are_invoked()
         {
             var item1Called = false;
             Action<NancyContext> item1 = (r) => { item1Called = true; };
@@ -60,7 +62,7 @@
             Action<NancyContext> action = context => { };
             pipeline += action;
 
-            pipeline.Invoke(CreateContext(), CancellationToken.None);
+            await pipeline.Invoke(CreateContext(), CancellationToken.None);
 
             Assert.True(item1Called);
             Assert.True(item2Called);
@@ -77,7 +79,7 @@
         }
 
         [Fact]
-        public void Pipeline_containing_another_pipeline_will_invoke_items_in_both_pipelines()
+        public async Task Pipeline_containing_another_pipeline_will_invoke_items_in_both_pipelines()
         {
             var item1Called = false;
             Action<NancyContext> item1 = (r) => { item1Called = true; };
@@ -94,7 +96,7 @@
             subPipeline += item4;
 
             pipeline.AddItemToEndOfPipeline(subPipeline);
-            pipeline.Invoke(CreateContext(), new CancellationToken());
+            await pipeline.Invoke(CreateContext(), new CancellationToken());
 
             Assert.True(item1Called);
             Assert.True(item2Called);

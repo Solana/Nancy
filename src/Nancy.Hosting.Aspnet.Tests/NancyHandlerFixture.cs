@@ -4,12 +4,14 @@ namespace Nancy.Hosting.Aspnet.Tests
     using System.Collections.Specialized;
     using System.IO;
     using System.Threading;
+    using System.Threading.Tasks;
     using System.Web;
-    using Nancy.Cookies;
+
     using FakeItEasy;
 
+    using Nancy.Cookies;
     using Nancy.Helpers;
-    using Nancy.Hosting.Aspnet;
+
     using Xunit;
 
     public class NancyHandlerFixture
@@ -42,20 +44,19 @@ namespace Nancy.Hosting.Aspnet.Tests
         }
 
         [Fact]
-        public void Should_invoke_engine_with_requested_method()
+        public async Task Should_invoke_engine_with_requested_method()
         {
             // Given
-            var nancyContext = new NancyContext() {Response = new Response()};
+            var nancyContext = new NancyContext {Response = new Response()};
             A.CallTo(() => this.request.HttpMethod).Returns("POST");
             A.CallTo(() => this.engine.HandleRequest(
                                         A<Request>.Ignored,
                                         A<Func<NancyContext, NancyContext>>.Ignored,
                                         A<CancellationToken>.Ignored))
-                                      .Returns(TaskHelpers.GetCompletedTask(nancyContext));
+                                      .Returns(Task.FromResult(nancyContext));
 
             // When
-            var task = this.handler.ProcessRequest(this.context, ar => { }, new object());
-            NancyHandler.EndProcessRequest(task);
+            await this.handler.ProcessRequest(this.context);
 
             // Then
             A.CallTo(() => this.engine.HandleRequest(A<Request>
@@ -65,13 +66,13 @@ namespace Nancy.Hosting.Aspnet.Tests
         }
 
         [Fact]
-        public void Should_output_the_responses_cookies()
+        public async Task Should_output_the_responses_cookies()
         {
             // Given
             var cookie1 = A.Fake<INancyCookie>();
             var cookie2 = A.Fake<INancyCookie>();
             var r = new Response();
-            r.AddCookie(cookie1).AddCookie(cookie2);
+            r.WithCookie(cookie1).WithCookie(cookie2);
             var nancyContext = new NancyContext { Response = r };
 
             A.CallTo(() => cookie1.ToString()).Returns("the first cookie");
@@ -80,8 +81,7 @@ namespace Nancy.Hosting.Aspnet.Tests
             SetupRequestProcess(nancyContext);
 
             // When
-            var task = this.handler.ProcessRequest(context, ar => { }, new object());
-            NancyHandler.EndProcessRequest(task);
+            await this.handler.ProcessRequest(context);
 
             // Then
             A.CallTo(() => this.response.AddHeader("Set-Cookie", "the first cookie")).MustHaveHappened();
@@ -89,7 +89,7 @@ namespace Nancy.Hosting.Aspnet.Tests
         }
 
         [Fact]
-        public void Should_dispose_the_context()
+        public async Task Should_dispose_the_context()
         {
             // Given
             var disposable = A.Fake<IDisposable>();
@@ -100,11 +100,10 @@ namespace Nancy.Hosting.Aspnet.Tests
                                         A<Request>.Ignored,
                                         A<Func<NancyContext, NancyContext>>.Ignored,
                                         A<CancellationToken>.Ignored))
-                                      .Returns(TaskHelpers.GetCompletedTask(nancyContext));
+                                      .Returns(Task.FromResult(nancyContext));
 
             // When
-            var task = this.handler.ProcessRequest(this.context, ar => { }, new object());
-            NancyHandler.EndProcessRequest(task);
+            await this.handler.ProcessRequest(this.context);
 
             // Then
             A.CallTo(() => disposable.Dispose()).MustHaveHappened(Repeated.Exactly.Once);
@@ -119,7 +118,7 @@ namespace Nancy.Hosting.Aspnet.Tests
                                         A<Request>.Ignored,
                                         A<Func<NancyContext, NancyContext>>.Ignored,
                                         A<CancellationToken>.Ignored))
-                                      .Returns(TaskHelpers.GetCompletedTask(nancyContext));
+                                      .Returns(Task.FromResult(nancyContext));
         }
     }
 }

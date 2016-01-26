@@ -10,9 +10,9 @@
     /// </summary>
     public class OptionsRoute : Route
     {
-        public OptionsRoute(string path, IEnumerable<string> allowedMethods) 
+        public OptionsRoute(string path, IEnumerable<string> allowedMethods)
             : base("OPTIONS", path, null, (x,c) => CreateMethodOptionsResponse(allowedMethods))
-        {            
+        {
         }
 
         private static Task<dynamic> CreateMethodOptionsResponse(IEnumerable<string> allowedMethods)
@@ -21,7 +21,7 @@
             response.Headers["Allow"] = string.Join(", ", allowedMethods);
             response.StatusCode = HttpStatusCode.OK;
 
-            return TaskHelpers.GetCompletedTask<dynamic>(response);
+            return Task.FromResult<dynamic>(response);
         }
     }
 }

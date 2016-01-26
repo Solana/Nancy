@@ -1,8 +1,11 @@
 ﻿#if !__MonoCS__ 
 namespace Nancy.Tests.Unit
 {
+    using System;
+    using System.Collections.Generic;
+
     using Nancy.Bootstrapper;
-    using Bootstrapper.Base;
+    using Nancy.Tests.Unit.Bootstrapper.Base;
     using Nancy.TinyIoc;
 
     public class DefaultNancyBootstrapperBootstrapperBaseFixture : BootstrapperBaseFixtureBase<TinyIoCContainer>
@@ -26,6 +29,14 @@ namespace Nancy.Tests.Unit
             protected override NancyInternalConfiguration InternalConfiguration
             {
                 get { return configuration; }
+            }
+
+            protected override IEnumerable<Type> RegistrationTasks
+            {
+                get
+                {
+                    return new[] { typeof(TestRegistrations) };
+                }
             }
 
             public FakeBootstrapper(NancyInternalConfiguration configuration)

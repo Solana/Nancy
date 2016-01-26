@@ -18,7 +18,7 @@
         /// the provided <paramref name="passphrase"/>, <paramref name="salt"/> and optional
         /// number of <paramref name="iterations"/>
         /// </summary>
-        /// <param name="passphrase">The passphrade that should be used.</param>
+        /// <param name="passphrase">The passphrase that should be used.</param>
         /// <param name="salt">The salt</param>
         /// <param name="iterations">The number of iterations. The default value is 10000.</param>
         public PassphraseKeyGenerator(string passphrase, byte[] salt, int iterations = 10000)
@@ -35,7 +35,7 @@
         /// Generate a sequence of bytes
         /// </summary>
         /// <param name="count">Number of bytes to return</param>
-        /// <returns>Array <see cref="count"/> bytes</returns>
+        /// <returns>Array <see paramref="count"/> bytes</returns>
         public byte[] GetBytes(int count)
         {
             return provider.GetBytes(count);

@@ -1,12 +1,14 @@
 ﻿namespace Nancy.Routing
 {
     using System;
+    using System.Diagnostics;
     using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
     /// Stores information about a declared route in Nancy.
     /// </summary>
+    [DebuggerDisplay("{Description.DebuggerDisplay, nq}")]
     public class Route
     {
         /// <summary>
@@ -28,12 +30,25 @@
         /// <summary>
         /// Initializes a new instance of the <see cref="Route"/> type, with the specified definition.
         /// </summary>
+        /// <param name="name">Route name</param>
+        /// <param name="method">The HTTP method that the route is declared for.</param>
+        /// <param name="path">The path that the route is declared for.</param>
+        /// <param name="condition">A condition that needs to be satisfied inorder for the route to be eligible for invocation.</param>
+        /// <param name="action">The action that should take place when the route is invoked.</param>
+        public Route(string name, string method, string path, Func<NancyContext, bool> condition, Func<dynamic, CancellationToken, Task<dynamic>> action)
+            : this(new RouteDescription(name, method, path, condition), action)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Route"/> type, with the specified definition.
+        /// </summary>
         /// <param name="method">The HTTP method that the route is declared for.</param>
         /// <param name="path">The path that the route is declared for.</param>
         /// <param name="condition">A condition that needs to be satisfied inorder for the route to be eligiable for invocation.</param>
         /// <param name="action">The action that should take place when the route is invoked.</param>
         public Route(string method, string path, Func<NancyContext, bool> condition, Func<dynamic, CancellationToken, Task<dynamic>> action)
-            : this(new RouteDescription(method, path, condition), action)
+            : this(string.Empty, method, path, condition, action)
         {
         }
 
@@ -57,7 +72,7 @@
         /// <returns>A (hot) task of <see cref="Response"/> instance.</returns>
         public Task<dynamic> Invoke(DynamicDictionary parameters, CancellationToken cancellationToken)
         {
-            return this.Action.Invoke(parameters, cancellationToken); ;
+            return this.Action.Invoke(parameters, cancellationToken);
         }
 
         /// <summary>
@@ -66,6 +81,7 @@
         /// <param name="description"></param>
         /// <param name="syncFunc">The action that should take place when the route is invoked.</param>
         /// <returns>A Route instance</returns>
+        [Obsolete("Sync routes are deprecated (see LegacyNancyModule)")]
         public static Route FromSync(RouteDescription description, Func<dynamic, dynamic> syncFunc)
         {
             return new Route(description, Wrap(syncFunc));
@@ -79,9 +95,25 @@
         /// <param name="condition">A condition that needs to be satisfied inorder for the route to be eligiable for invocation.</param>
         /// <param name="syncFunc">The action that should take place when the route is invoked.</param>
         /// <returns>A Route instance</returns>
+        [Obsolete("Sync routes are deprecated (see LegacyNancyModule)")]
         public static Route FromSync(string method, string path, Func<NancyContext, bool> condition, Func<dynamic, dynamic> syncFunc)
         {
-            return FromSync(new RouteDescription(method, path, condition), syncFunc);
+            return FromSync(string.Empty, method, path, condition, syncFunc);
+        }
+
+        /// <summary>
+        /// Creates a route from a sync delegate signature
+        /// </summary>
+        /// <param name="name">Route name</param>
+        /// <param name="method">The HTTP method that the route is declared for.</param>
+        /// <param name="path">The path that the route is declared for.</param>
+        /// <param name="condition">A condition that needs to be satisfied inorder for the route to be eligible for invocation.</param>
+        /// <param name="syncFunc">The action that should take place when the route is invoked.</param>
+        /// <returns>A Route instance</returns>
+        [Obsolete("Sync routes are deprecated (see LegacyNancyModule)")]
+        public static Route FromSync(string name, string method, string path, Func<NancyContext, bool> condition, Func<dynamic, dynamic> syncFunc)
+        {
+            return FromSync(new RouteDescription(name, method, path, condition), syncFunc);
         }
 
         /// <summary>

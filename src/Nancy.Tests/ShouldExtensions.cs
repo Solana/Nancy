@@ -5,6 +5,7 @@
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+
     using Xunit;
 
     public static class ShouldAssertExtensions
@@ -50,6 +51,16 @@
                 select c;
 
             Assert.True(selection.Any());
+        }
+
+        public static void ShouldNotContainType<T>(this IEnumerable collection)
+        {
+            var selection =
+                from c in collection.Cast<object>()
+                where c.GetType().IsAssignableFrom(typeof(T))
+                select c;
+
+            Assert.False(selection.Any());
         }
 
         public static void ShouldContainInOrder(this string actual, params string[] values)
@@ -181,7 +192,7 @@
             using (var reader = new StreamReader(stream))
             {
                 var actual = reader.ReadToEnd();
-                    
+
                 if (trim)
                 {
                     actual = actual.Trim();

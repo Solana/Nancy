@@ -1,9 +1,8 @@
 namespace Nancy.Hosting.Self
 {
-    using System;
     using System.IO;
     using System.Reflection;
-    
+
     public class FileSystemRootPathProvider : IRootPathProvider
     {
         public string GetRootPath()

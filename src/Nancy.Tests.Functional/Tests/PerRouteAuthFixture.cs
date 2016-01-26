@@ -1,159 +1,97 @@
 ﻿namespace Nancy.Tests.Functional.Tests
 {
-    using System.Collections.Generic;
-    using Nancy.Security;
+    using System.Linq;
+    using System.Security.Claims;
+    using System.Threading.Tasks;
     using Nancy.Testing;
     using Nancy.Tests.Functional.Modules;
+
     using Xunit;
-    using Xunit.Extensions;
 
     public class PerRouteAuthFixture
     {
         [Fact]
-        public void Should_allow_access_to_unsecured_route()
+        public async Task Should_allow_access_to_unsecured_route()
         {
             var browser = new Browser(with => with.Module<PerRouteAuthModule>());
 
-            var result = browser.Get("/nonsecured");
+            var result = await browser.Get("/nonsecured");
 
             Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         }
 
         [Fact]
-        public void Should_protect_secured_route()
+        public async Task Should_protect_secured_route()
         {
             var browser = new Browser(with => with.Module<PerRouteAuthModule>());
 
-            var result = browser.Get("/secured");
+            var result = await browser.Get("/secured");
 
             Assert.Equal(HttpStatusCode.Unauthorized, result.StatusCode);
         }
 
         [Fact]
-        public void Should_deny_if_claims_wrong()
+        public async Task Should_deny_if_claims_wrong()
         {
             var browser = new Browser(with =>
             {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser("test2"));
+                with.RequestStartup((t, p, c) => c.CurrentUser = CreateFakeUser("test2"));
                 with.Module<PerRouteAuthModule>();
             });
 
-            var result = browser.Get("/requiresclaims");
+            var result = await browser.Get("/requiresclaims");
 
             Assert.Equal(HttpStatusCode.Forbidden, result.StatusCode);
         }
 
         [Fact]
-        public void Should_allow_if_claims_correct()
+        public async Task Should_allow_if_claims_correct()
         {
             var browser = new Browser(with =>
             {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser("test", "test2"));
+                with.RequestStartup((t, p, c) => c.CurrentUser = CreateFakeUser("test", "test2"));
                 with.Module<PerRouteAuthModule>();
             });
 
-            var result = browser.Get("/requiresclaims");
+            var result = await browser.Get("/requiresclaims");
 
             Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        }
-
-        [Theory]
-        [PropertyData("Claims")]
-        public void Should_allow_if_claims_correct_case_insensitively(params string[] claims)
-        {
-            var browser = new Browser(with =>
-            {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser(claims));
-                with.Module<PerRouteAuthModule>();
-            });
-
-            var result = browser.Get("/requiresclaims");
-
-            Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        }
-
-        public static IEnumerable<object[]> Claims
-        {
-            get
-            {
-                yield return new object[] { new[] { "TEST", "TEST2" } };
-                yield return new object[] { new[] { "TEST", "test2" } };
-                yield return new object[] { new[] { "test", "TEST2" } };
-                yield return new object[] { new[] { "test", "test2" } };
-                yield return new object[] { new[] { "Test", "Test2" } };
-                yield return new object[] { new[] { "TesT", "TesT2" } };
-                yield return new object[] { new[] { "TEsT", "TEsT2" } };
-                yield return new object[] { new[] { "TeSt", "TeSt2" } };
-            }
         }
 
         [Fact]
-        public void Should_deny_if_anyclaims_not_found()
+        public async Task Should_deny_if_anyclaims_not_found()
         {
             var browser = new Browser(with =>
             {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser("test3"));
+                with.RequestStartup((t, p, c) => c.CurrentUser = CreateFakeUser("test3"));
                 with.Module<PerRouteAuthModule>();
             });
 
-            var result = browser.Get("/requiresanyclaims");
+            var result = await browser.Get("/requiresanyclaims");
 
             Assert.Equal(HttpStatusCode.Forbidden, result.StatusCode);
         }
 
         [Fact]
-        public void Should_allow_if_anyclaim_found()
+        public async Task Should_allow_if_anyclaim_found()
         {
             var browser = new Browser(with =>
             {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser("test2"));
+                with.RequestStartup((t, p, c) => c.CurrentUser = CreateFakeUser("test2"));
                 with.Module<PerRouteAuthModule>();
             });
 
-            var result = browser.Get("/requiresanyclaims");
+            var result = await browser.Get("/requiresanyclaims");
 
             Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         }
 
-        [Fact]
-        public void Should_deny_if_validated_claims_fails()
+        private static ClaimsPrincipal CreateFakeUser(params string[] claimTypes)
         {
-            var browser = new Browser(with =>
-            {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser("test2"));
-                with.Module<PerRouteAuthModule>();
-            });
-
-            var result = browser.Get("/requiresvalidatedclaims");
-
-            Assert.Equal(HttpStatusCode.Forbidden, result.StatusCode);
-        }
-
-        [Fact]
-        public void Should_allow_if_validated_claims_passes()
-        {
-            var browser = new Browser(with =>
-            {
-                with.RequestStartup((t, p, c) => c.CurrentUser = new FakeUser("test"));
-                with.Module<PerRouteAuthModule>();
-            });
-
-            var result = browser.Get("/requiresvalidatedclaims");
-
-            Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        }
-    }
-
-    public class FakeUser : IUserIdentity
-    {
-        public string UserName { get; private set; }
-
-        public IEnumerable<string> Claims { get; private set; }
-
-        public FakeUser(params string[] claims)
-        {
-            this.UserName = "Bob";
-            this.Claims = claims;
+            var claims = claimTypes.Select(claimType => new Claim(claimType, string.Empty)).ToList();
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, "user"));
+            
+            return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
         }
     }
 }

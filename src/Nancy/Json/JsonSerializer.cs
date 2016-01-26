@@ -33,12 +33,13 @@ namespace Nancy.Json
     using System.Collections.Generic;
     using System.Globalization;
     using System.IO;
+    using System.Linq;
     using System.Reflection;
     using System.Text;
 
     using Nancy.Extensions;
 
-	internal sealed class JsonSerializer
+    internal sealed class JsonSerializer
 	{
         internal static readonly long InitialJavaScriptDateTicks = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
         static readonly DateTime MinimumJavaScriptDate = new DateTime(100, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -141,6 +142,20 @@ namespace Nancy.Json
 				return;
 			}
 
+			JavaScriptPrimitiveConverter jscp = serializer.GetPrimitiveConverter (valueType);
+
+			if (jscp != null) {
+				obj = jscp.Serialize (obj, serializer);
+
+				if (obj == null || DBNull.Value.Equals (obj)) {
+					// Recurse in order that there be one place in the code that handles null values.
+					SerializeValueImpl (obj, output);
+					return;
+				}
+
+				valueType = obj.GetType ();
+			}
+
 			TypeCode typeCode = Type.GetTypeCode (valueType);
 			switch (typeCode) {
 				case TypeCode.String:
@@ -195,6 +210,12 @@ namespace Nancy.Json
 				WriteValue (output, (Guid)obj);
 				return;
 			}
+
+            if (valueType == typeof(DateTimeOffset))
+            {
+                WriteValue(output, (DateTimeOffset)obj);
+                return;
+            }
 
 			if (typeof (DynamicDictionaryValue).IsAssignableFrom(valueType))
 			{
@@ -265,8 +286,8 @@ namespace Nancy.Json
 			getMethod = null;
 			if (mi == null)
 				return true;
-			
-			if (mi.IsDefined (typeof (ScriptIgnoreAttribute), true))
+
+			if (mi.GetCustomAttributes(true).Any(a => a.GetType().Name == "ScriptIgnoreAttribute"))
 				return true;
 			
 			FieldInfo fi = mi as FieldInfo;
@@ -480,7 +501,12 @@ namespace Nancy.Json
 		{
 		    if (this.iso8601DateFormat)
 		    {
-                StringBuilderExtensions.AppendCount(output, maxJsonLength, string.Concat("\"", value.ToString("s", CultureInfo.InvariantCulture), "\""));
+		        if (value.Kind == DateTimeKind.Unspecified)
+		        {
+		            // To avoid confusion, treat "Unspecified" datetimes as Local -- just like the WCF datetime format does as well.
+		            value = new DateTime(value.Ticks, DateTimeKind.Local);
+		        }
+		        StringBuilderExtensions.AppendCount(output, maxJsonLength, string.Concat("\"", value.ToString("o", CultureInfo.InvariantCulture), "\""));
 		    }
 		    else
 		    {
@@ -490,7 +516,7 @@ namespace Nancy.Json
 		        if (value.Kind != DateTimeKind.Utc)
 		        {
 		            TimeSpan localTZOffset;
-		            if (value > time)
+		            if (value >= time)
 		            {
 		                localTZOffset = value - time;
 		                suffix = "+";
@@ -510,6 +536,11 @@ namespace Nancy.Json
 		        StringBuilderExtensions.AppendCount(output, maxJsonLength, "\"\\/Date(" + ticks + suffix + ")\\/\"");
 		    }
 		}
+
+        void WriteValue(StringBuilder output, DateTimeOffset value)
+        {
+            StringBuilderExtensions.AppendCount(output, maxJsonLength, string.Concat("\"", value.ToString("o", CultureInfo.InvariantCulture), "\""));
+        }
 
 		void WriteValue (StringBuilder output, IConvertible value)
 		{

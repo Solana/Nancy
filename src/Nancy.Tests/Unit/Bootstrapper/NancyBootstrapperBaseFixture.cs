@@ -1,17 +1,18 @@
-﻿using Nancy.Diagnostics;
-
-namespace Nancy.Tests.Unit.Bootstrapper
+﻿namespace Nancy.Tests.Unit.Bootstrapper
 {
     using System;
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using System.Collections;
-    using System.Reflection;
     using System.Threading;
+    using System.Threading.Tasks;
     using FakeItEasy;
+
     using Nancy.Bootstrapper;
+    using Nancy.Configuration;
+    using Nancy.Diagnostics;
     using Nancy.Tests.Fakes;
+
     using Xunit;
 
     public class NancyBootstrapperBaseFixture
@@ -72,8 +73,8 @@ namespace Nancy.Tests.Unit.Bootstrapper
 
             // Then
             this.bootstrapper.PassedModules.ShouldNotBeNull();
-            this.bootstrapper.PassedModules.Where(mr => mr.ModuleType == typeof(Fakes.FakeNancyModuleWithBasePath)).FirstOrDefault().ShouldNotBeNull();
-            this.bootstrapper.PassedModules.Where(mr => mr.ModuleType == typeof(Fakes.FakeNancyModuleWithoutBasePath)).FirstOrDefault().ShouldNotBeNull();
+            this.bootstrapper.PassedModules.Where(mr => mr.ModuleType == typeof(FakeNancyModuleWithBasePath)).FirstOrDefault().ShouldNotBeNull();
+            this.bootstrapper.PassedModules.Where(mr => mr.ModuleType == typeof(FakeNancyModuleWithoutBasePath)).FirstOrDefault().ShouldNotBeNull();
         }
 
         [Fact]
@@ -125,9 +126,9 @@ namespace Nancy.Tests.Unit.Bootstrapper
             // Given
             var startup = A.Fake<IApplicationStartup>();
             this.bootstrapper.OverriddenApplicationStartupTasks = new[] { startup };
-            
-            var registrations = A.Fake<IApplicationRegistrations>();
-            this.bootstrapper.OverriddenApplicationRegistrationTasks = new[] { registrations };
+
+            var registrations = A.Fake<IRegistrations>();
+            this.bootstrapper.OverriddenRegistrationTasks = new[] { registrations };
 
             // When
             using(var scope = Fake.CreateScope())
@@ -148,15 +149,15 @@ namespace Nancy.Tests.Unit.Bootstrapper
         {
             // Given
             var typeRegistrations = new TypeRegistration[] { };
-            var startupStub = A.Fake<IApplicationRegistrations>();
+            var startupStub = A.Fake<IRegistrations>();
             A.CallTo(() => startupStub.TypeRegistrations).Returns(typeRegistrations);
-            this.bootstrapper.OverriddenApplicationRegistrationTasks = new[] { startupStub };
+            this.bootstrapper.OverriddenRegistrationTasks = new[] { startupStub };
 
             // When
             this.bootstrapper.Initialise();
 
             // Then
-            this.bootstrapper.TypeRegistrations.ShouldBeSameAs(typeRegistrations);
+            this.bootstrapper.ApplicationTypeRegistrations.ShouldBeSameAs(typeRegistrations);
         }
 
         [Fact]
@@ -164,9 +165,9 @@ namespace Nancy.Tests.Unit.Bootstrapper
         {
             // Given
             var collectionTypeRegistrations = new CollectionTypeRegistration[] { };
-            var startupStub = A.Fake<IApplicationRegistrations>();
+            var startupStub = A.Fake<IRegistrations>();
             A.CallTo(() => startupStub.CollectionTypeRegistrations).Returns(collectionTypeRegistrations);
-            this.bootstrapper.OverriddenApplicationRegistrationTasks = new[] { startupStub };
+            this.bootstrapper.OverriddenRegistrationTasks = new[] { startupStub };
 
             // When
             this.bootstrapper.Initialise();
@@ -180,9 +181,9 @@ namespace Nancy.Tests.Unit.Bootstrapper
         {
             // Given
             var instanceRegistrations = new InstanceRegistration[] { };
-            var startupStub = A.Fake<IApplicationRegistrations>();
+            var startupStub = A.Fake<IRegistrations>();
             A.CallTo(() => startupStub.InstanceRegistrations).Returns(instanceRegistrations);
-            this.bootstrapper.OverriddenApplicationRegistrationTasks = new[] { startupStub };
+            this.bootstrapper.OverriddenRegistrationTasks = new[] { startupStub };
 
             // When
             this.bootstrapper.Initialise();
@@ -233,6 +234,56 @@ namespace Nancy.Tests.Unit.Bootstrapper
             this.bootstrapper.AppContainer.Disposed.ShouldBeTrue();
         }
 
+        [Fact]
+        public async Task Should_only_get_request_startup_tasks_once()
+        {
+            // Given
+            var uninitialiedBootstrapper = new FakeBootstrapperBaseImplementation();
+            uninitialiedBootstrapper.Initialise();
+            var engine = uninitialiedBootstrapper.GetEngine();
+
+            // When
+            await engine.HandleRequest(new FakeRequest("GET", "/"));
+            await engine.HandleRequest(new FakeRequest("GET", "/"));
+
+            // Then
+            uninitialiedBootstrapper.RequestStartupTasksCalls.ShouldEqual(1);
+        }
+
+        [Fact]
+        public void Should_invoke_request_startup_tasks_when_request_pipelines_initialised()
+        {
+            // Given
+            var uninitialiedBootstrapper = new FakeBootstrapperBaseImplementation();
+            var startupMock = A.Fake<IRequestStartup>();
+            var startupMock2 = A.Fake<IRequestStartup>();
+            uninitialiedBootstrapper.RequestStartupTypes = new[] { typeof(object) };
+            uninitialiedBootstrapper.RequestStartups = new[] { startupMock, startupMock2 };
+            uninitialiedBootstrapper.Initialise();
+
+            // When
+            uninitialiedBootstrapper.GetRequestPipelines(new NancyContext());
+
+            // Then
+            A.CallTo(() => startupMock.Initialize(A<IPipelines>._, A<NancyContext>._)).MustHaveHappened(Repeated.Exactly.Once);
+            A.CallTo(() => startupMock2.Initialize(A<IPipelines>._, A<NancyContext>._)).MustHaveHappened(Repeated.Exactly.Once);
+        }
+
+        [Fact]
+        public void Should_not_ask_to_resolve_request_startups_if_none_registered()
+        {
+            // Given
+            var uninitialiedBootstrapper = new FakeBootstrapperBaseImplementation();
+            uninitialiedBootstrapper.RequestStartupTypes = new Type[] { };
+            uninitialiedBootstrapper.Initialise();
+
+            // When
+            uninitialiedBootstrapper.GetRequestPipelines(new NancyContext());
+
+            // Then
+            uninitialiedBootstrapper.GetRequestStartupTasksCalled.ShouldBeFalse();
+        }
+
         private static IEnumerable<byte> GetBodyBytes(Response response)
         {
             using (var contentsStream = new MemoryStream())
@@ -250,18 +301,32 @@ namespace Nancy.Tests.Unit.Bootstrapper
         public INancyEngine FakeNancyEngine { get; set; }
         public FakeContainer FakeContainer { get; set; }
         public FakeContainer AppContainer { get; set; }
-        public IEnumerable<TypeRegistration> TypeRegistrations { get; set; }
+        public IEnumerable<TypeRegistration> ApplicationTypeRegistrations { get; set; }
         public IEnumerable<CollectionTypeRegistration> CollectionTypeRegistrations { get; set; }
         public IEnumerable<InstanceRegistration> InstanceRegistrations { get; set; }
         public List<ModuleRegistration> PassedModules { get; set; }
         public IApplicationStartup[] OverriddenApplicationStartupTasks { get; set; }
-        public IApplicationRegistrations[] OverriddenApplicationRegistrationTasks { get; set; }
+        public IRegistrations[] OverriddenRegistrationTasks { get; set; }
         public bool ShouldThrowWhenGettingEngine { get; set; }
+        public int RequestStartupTasksCalls { get; set; }
+        public IEnumerable<IRequestStartup> RequestStartups { get; set; }
+        public bool GetRequestStartupTasksCalled { get; set; }
+        public IEnumerable<Type> RequestStartupTypes { get; set; }
 
         public FakeBootstrapperBaseImplementation()
         {
             FakeNancyEngine = A.Fake<INancyEngine>();
             FakeContainer = new FakeContainer();
+        }
+
+        protected override IEnumerable<Type> RequestStartupTasks
+        {
+            get
+            {
+                this.RequestStartupTasksCalls++;
+
+                return this.RequestStartupTypes ?? base.RequestStartupTasks;
+            }
         }
 
         protected override INancyEngine GetEngineInternal()
@@ -272,6 +337,11 @@ namespace Nancy.Tests.Unit.Bootstrapper
             }
 
             return this.FakeNancyEngine;
+        }
+
+        protected override INancyEnvironmentConfigurator GetEnvironmentConfigurator()
+        {
+            return new FakeEnvironmentConfigurator();
         }
 
         /// <summary>
@@ -292,13 +362,20 @@ namespace Nancy.Tests.Unit.Bootstrapper
             return this.OverriddenApplicationStartupTasks ?? new IApplicationStartup[] { };
         }
 
+        protected override IEnumerable<IRequestStartup> RegisterAndGetRequestStartupTasks(FakeContainer container, Type[] requestStartupTypes)
+        {
+            this.GetRequestStartupTasksCalled = true;
+
+            return this.RequestStartups;
+        }
+
         /// <summary>
         /// Gets all registered application registration tasks
         /// </summary>
-        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IApplicationRegistrations"/> instances.</returns>
-        protected override IEnumerable<IApplicationRegistrations> GetApplicationRegistrationTasks()
+        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IRegistrations"/> instances.</returns>
+        protected override IEnumerable<IRegistrations> GetRegistrationTasks()
         {
-            return this.OverriddenApplicationRegistrationTasks ?? new IApplicationRegistrations[] { };
+            return this.OverriddenRegistrationTasks ?? new IRegistrations[] { };
         }
 
         /// <summary>
@@ -319,6 +396,11 @@ namespace Nancy.Tests.Unit.Bootstrapper
                     .FirstOrDefault();
         }
 
+        public override INancyEnvironment GetEnvironment()
+        {
+            throw new NotImplementedException();
+        }
+
         protected override void ConfigureApplicationContainer(FakeContainer existingContainer)
         {
             this.AppContainer = existingContainer;
@@ -327,6 +409,10 @@ namespace Nancy.Tests.Unit.Bootstrapper
         protected override FakeContainer GetApplicationContainer()
         {
             return FakeContainer;
+        }
+
+        protected override void RegisterNancyEnvironment(FakeContainer container, INancyEnvironment environment)
+        {
         }
 
         /// <summary>
@@ -341,7 +427,7 @@ namespace Nancy.Tests.Unit.Bootstrapper
 
         protected override void RegisterTypes(FakeContainer container, IEnumerable<TypeRegistration> typeRegistrations)
         {
-            this.TypeRegistrations = typeRegistrations;
+            this.ApplicationTypeRegistrations = typeRegistrations;
         }
 
         protected override void RegisterCollectionTypes(FakeContainer container, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrations)
@@ -377,6 +463,11 @@ namespace Nancy.Tests.Unit.Bootstrapper
         }
 
         public byte[] Favicon { get; set; }
+
+        public IPipelines GetRequestPipelines(NancyContext context)
+        {
+            return this.InitializeRequestPipelines(context);
+        }
     }
 
     internal class FakeContainer : IDisposable
@@ -387,6 +478,14 @@ namespace Nancy.Tests.Unit.Bootstrapper
         }
 
         public bool Disposed { get; private set; }
+    }
+
+    internal class FakeEnvironmentConfigurator : INancyEnvironmentConfigurator
+    {
+        public INancyEnvironment ConfigureEnvironment(Action<INancyEnvironment> configuration)
+        {
+            return new DefaultNancyEnvironment();
+        }
     }
 
     internal class FakeBootstrapperBaseGetModulesOverride : NancyBootstrapperBase<object>
@@ -407,6 +506,11 @@ namespace Nancy.Tests.Unit.Bootstrapper
             ModuleRegistrations = new List<ModuleRegistration>() { new ModuleRegistration(this.GetType()) };
         }
 
+        protected override INancyEnvironmentConfigurator GetEnvironmentConfigurator()
+        {
+            return new FakeEnvironmentConfigurator();
+        }
+
         /// <summary>
         /// Gets the diagnostics for initialisation
         /// </summary>
@@ -425,13 +529,18 @@ namespace Nancy.Tests.Unit.Bootstrapper
             return new IApplicationStartup[] { };
         }
 
+        protected override IEnumerable<IRequestStartup> RegisterAndGetRequestStartupTasks(object container, Type[] requestStartupTypes)
+        {
+            return new IRequestStartup[] { };
+        }
+
         /// <summary>
         /// Gets all registered application registration tasks
         /// </summary>
-        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IApplicationRegistrations"/> instances.</returns>
-        protected override IEnumerable<IApplicationRegistrations> GetApplicationRegistrationTasks()
+        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IRegistrations"/> instances.</returns>
+        protected override IEnumerable<IRegistrations> GetRegistrationTasks()
         {
-            return new IApplicationRegistrations[] { };
+            return new IRegistrations[] { };
         }
 
         /// <summary>
@@ -455,6 +564,11 @@ namespace Nancy.Tests.Unit.Bootstrapper
             throw new NotImplementedException();
         }
 
+        public override INancyEnvironment GetEnvironment()
+        {
+            throw new NotImplementedException();
+        }
+
         protected override INancyEngine GetEngineInternal()
         {
             return A.Fake<INancyEngine>();
@@ -463,6 +577,10 @@ namespace Nancy.Tests.Unit.Bootstrapper
         protected override object GetApplicationContainer()
         {
             return new object();
+        }
+
+        protected override void RegisterNancyEnvironment(object container, INancyEnvironment environment)
+        {
         }
 
         /// <summary>

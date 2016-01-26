@@ -2,6 +2,7 @@ namespace Nancy.Bootstrapper
 {
     using System;
     using System.Linq;
+
     using Nancy.Extensions;
 
     /// <summary>
@@ -9,6 +10,11 @@ namespace Nancy.Bootstrapper
     /// </summary>
     public abstract class ContainerRegistration
     {
+        /// <summary>
+        /// Gets the lifetime of the registration
+        /// </summary>
+        public Lifetime Lifetime { get; protected set; }
+
         /// <summary>
         /// Registration type i.e. IMyInterface
         /// </summary>
@@ -38,7 +44,7 @@ namespace Nancy.Bootstrapper
                 var errorMessage =
                     string.Format("{0} must implement {1} inorder to be registered by {2}", incompatibleTypeNames, this.RegistrationType.FullName, this.GetType().Name);
 
-                throw new ArgumentException(errorMessage);  
+                throw new ArgumentException(errorMessage);
             }
         }
     }

@@ -58,7 +58,7 @@ namespace Nancy.Bootstrapper
         /// Gets or sets a set of rules for which assemblies are scanned
         /// Defaults to just assemblies that have references to nancy, and nancy
         /// itself.
-        /// Each item in the enumerable is a delegate that takes the assembly and 
+        /// Each item in the enumerable is a delegate that takes the assembly and
         /// returns true if it is to be included. Returning false doesn't mean it won't
         /// be included as a true from another delegate will take precedence.
         /// </summary>
@@ -172,7 +172,7 @@ namespace Nancy.Bootstrapper
 
             var unloadedAssemblies =
                 Directory.GetFiles(containingDirectory, wildcardFilename).Where(
-                    f => !existingAssemblyPaths.Contains(f, StringComparer.InvariantCultureIgnoreCase)).ToArray();
+                    f => !existingAssemblyPaths.Contains(f, StringComparer.OrdinalIgnoreCase)).ToArray();
 
 
             foreach (var unloadedAssembly in unloadedAssemblies)
@@ -228,7 +228,7 @@ namespace Nancy.Bootstrapper
             {
                 var unloadedAssemblies = Directory
                     .GetFiles(directory, "*.dll")
-                    .Where(f => !existingAssemblyPaths.Contains(f, StringComparer.InvariantCultureIgnoreCase)).ToArray();
+                    .Where(f => !existingAssemblyPaths.Contains(f, StringComparer.OrdinalIgnoreCase)).ToArray();
 
                 foreach (var unloadedAssembly in unloadedAssemblies)
                 {
@@ -237,9 +237,13 @@ namespace Nancy.Bootstrapper
                     {
                         inspectedAssembly = Assembly.ReflectionOnlyLoadFrom(unloadedAssembly);
                     }
-                    catch (BadImageFormatException biEx)
+                    catch (BadImageFormatException)
                     {
                         //the assembly maybe it's not managed code
+                    }
+                    catch (FileLoadException)
+                    {
+                        //the assembly might already be loaded
                     }
 
                     if (inspectedAssembly != null && inspectedAssembly.GetReferencedAssemblies().Any(r => r.Name.StartsWith("Nancy", StringComparison.OrdinalIgnoreCase)))
@@ -255,10 +259,6 @@ namespace Nancy.Bootstrapper
                 }
             }
 
-
-            UpdateTypes();
-
-           
             UpdateTypes();
 
             nancyReferencingAssembliesLoaded = true;
@@ -279,21 +279,26 @@ namespace Nancy.Bootstrapper
         /// Gets all types implementing a particular interface/base class
         /// </summary>
         /// <param name="type">Type to search for</param>
-        /// <param name="mode">A <see cref="ScanMode"/> value to determin which type set to scan in.</param>
+        /// <param name="mode">A <see cref="ScanMode"/> value to determine which type set to scan in.</param>
         /// <returns>An <see cref="IEnumerable{T}"/> of types.</returns>
         public static IEnumerable<Type> TypesOf(Type type, ScanMode mode)
         {
             var returnTypes =
                 Types.Where(type.IsAssignableFrom);
 
-            if (mode == ScanMode.All)
+            switch (mode)
             {
-                return returnTypes;
+                case ScanMode.OnlyNancy:
+                    return returnTypes.Where(t => t.Assembly == nancyAssembly);
+                case ScanMode.ExcludeNancy:
+                    return returnTypes.Where(t => t.Assembly != nancyAssembly);
+                case ScanMode.OnlyNancyNamespace:
+                    return returnTypes.Where(t => t.Namespace.StartsWith("Nancy"));
+                case ScanMode.ExcludeNancyNamespace:
+                    return returnTypes.Where(t => !t.Namespace.StartsWith("Nancy"));
+                default://mode == ScanMode.All
+                    return returnTypes;
             }
-
-            return (mode == ScanMode.OnlyNancy) ?
-                returnTypes.Where(t => t.Assembly == nancyAssembly) :
-                returnTypes.Where(t => t.Assembly != nancyAssembly);
         }
 
         /// <summary>
@@ -311,7 +316,7 @@ namespace Nancy.Bootstrapper
         /// Gets all types implementing a particular interface/base class
         /// </summary>
         /// <typeparam name="TType">Type to search for</typeparam>
-        /// <param name="mode">A <see cref="ScanMode"/> value to determin which type set to scan in.</param>
+        /// <param name="mode">A <see cref="ScanMode"/> value to determine which type set to scan in.</param>
         /// <returns>An <see cref="IEnumerable{T}"/> of types.</returns>
         public static IEnumerable<Type> TypesOf<TType>(ScanMode mode)
         {
@@ -321,7 +326,7 @@ namespace Nancy.Bootstrapper
         /// <summary>
         /// Returns the directories containing dll files. It uses the default convention as stated by microsoft.
         /// </summary>
-        /// <see cref="http://msdn.microsoft.com/en-us/library/system.appdomainsetup.privatebinpathprobe.aspx"/>
+        /// <see href="http://msdn.microsoft.com/en-us/library/system.appdomainsetup.privatebinpathprobe.aspx"/>
         private static IEnumerable<string> GetAssemblyDirectories()
         {
             var privateBinPathDirectories = AppDomain.CurrentDomain.SetupInformation.PrivateBinPath == null

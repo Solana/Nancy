@@ -1,9 +1,11 @@
 ﻿namespace Nancy.Validation.FluentValidation
 {
     using System.Collections.Generic;
-    using Nancy.Validation.Rules;
+
     using global::FluentValidation.Internal;
     using global::FluentValidation.Validators;
+
+    using Nancy.Validation.Rules;
 
     /// <summary>
     /// Adapter between the Fluent Validation <see cref="LessThanOrEqualValidator"/> and the Nancy validation rules.
@@ -13,7 +15,7 @@
         /// <summary>
         /// Gets whether or not the adapter can handle the provided <see cref="IPropertyValidator"/> instance.
         /// </summary>
-        /// <param name="validator">The <see cref="IPropertyValidator"/> instance to check for compatability with the adapter.</param>
+        /// <param name="validator">The <see cref="IPropertyValidator"/> instance to check for compatibility with the adapter.</param>
         /// <returns><see langword="true" /> if the adapter can handle the validator, otherwise <see langword="false" />.</returns>
         public override bool CanHandle(IPropertyValidator validator)
         {

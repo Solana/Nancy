@@ -5,7 +5,7 @@
     using System.Linq;
     using System.Reflection;
     using System.Text.RegularExpressions;
-    using ModelBinding;
+    using Nancy.ModelBinding;
 
     public class SettingsModule : DiagnosticModule
     {
@@ -15,7 +15,7 @@
         public SettingsModule()
             : base("/settings")
         {
-            Get["/"] = _ =>
+            Get["/"] = async (_, __) =>
             {
                 var properties = Types.SelectMany(t => t.GetProperties(BindingFlags.Static | BindingFlags.Public))
                                       .Where(x => x.PropertyType == typeof(bool));
@@ -32,13 +32,13 @@
                             Value = value,
                             Checked = (value) ? "checked='checked'" : string.Empty
                         };
-                
+
                 return View["Settings", model];
             };
 
-            Post["/"] = parameters => {
+            Post["/"] = async (_, __) => {
 
-                var model = 
+                var model =
                     this.Bind<SettingsModel>();
 
                 var property = GetProperty(model);
@@ -47,7 +47,7 @@
                 {
                     property.SetValue(null, model.Value, null);
                 }
-                
+
                 return HttpStatusCode.OK;
             };
         }

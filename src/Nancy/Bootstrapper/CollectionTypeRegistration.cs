@@ -1,8 +1,8 @@
 namespace Nancy.Bootstrapper
 {
     using System;
-    using System.Linq;
     using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
     /// Represents a type to be registered multiple times into the
@@ -18,7 +18,8 @@ namespace Nancy.Bootstrapper
         /// </summary>
         /// <param name="registrationType">Registration type i.e. IMyInterface</param>
         /// <param name="implementationTypes">Collection of implementation type i.e. MyClassThatImplementsIMyInterface</param>
-        public CollectionTypeRegistration(Type registrationType, IEnumerable<Type> implementationTypes)
+        /// <param name="lifetime">Lifetime to register the type as</param>
+        public CollectionTypeRegistration(Type registrationType, IEnumerable<Type> implementationTypes, Lifetime lifetime = Lifetime.Singleton)
         {
             if (registrationType == null)
             {
@@ -32,6 +33,7 @@ namespace Nancy.Bootstrapper
 
             this.RegistrationType = registrationType;
             this.ImplementationTypes = implementationTypes;
+            this.Lifetime = lifetime;
 
             this.ValidateTypeCompatibility(implementationTypes.ToArray());
         }

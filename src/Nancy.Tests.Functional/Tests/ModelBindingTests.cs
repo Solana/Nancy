@@ -1,10 +1,11 @@
 ﻿namespace Nancy.Tests.Functional.Tests
 {
     using System.Collections.Generic;
-    using System.Linq;
-    using Bootstrapper;
-    using ModelBinding;
-    using Testing;
+    using System.Threading.Tasks;
+    using Nancy.Bootstrapper;
+    using Nancy.ModelBinding;
+    using Nancy.Testing;
+
     using Xunit;
 
     public class ModelBindingFixture
@@ -21,33 +22,33 @@
         }
 
         [Fact]
-        public void Should_be_able_to_modelbind_json_content_to_list()
+        public async Task Should_be_able_to_modelbind_json_content_to_list()
         {
             // Given
             const string body = "[{ 'key1': 'value1' , 'key2': 'value2'},{ 'key1': 'value1' , 'key2': 'value2'}, { 'key1': 'value1' , 'key2': 'value2'}]";
 
             // When
-            var result = this.browser.Post("/jsonlist", with => with.Body(body, "application/json"));
+            var result = await this.browser.Post("/jsonlist", with => with.Body(body, "application/json"));
 
             // Then
             Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         }
 
         [Fact]
-        public void Should_be_able_to_bind_body_and_other_sources_separately()
+        public async Task Should_be_able_to_bind_body_and_other_sources_separately()
         {
             // Given
             const string body = "{ 'key1': 'body' , 'key2': 'value2'}";
 
             // When
-            var result = this.browser.Put("/foo/param", with => with.Body(body, "application/json"));
+            var result = await this.browser.Put("/foo/param", with => with.Body(body, "application/json"));
 
             // Then
             Assert.Equal(HttpStatusCode.OK, result.StatusCode);
         }
     }
 
-    public class ModelBindingModule : NancyModule
+    public class ModelBindingModule : LegacyNancyModule
     {
         public ModelBindingModule()
         {
@@ -62,7 +63,7 @@
         }
     }
 
-    public class MixedSourceModelBindingModule : NancyModule
+    public class MixedSourceModelBindingModule : LegacyNancyModule
     {
         public MixedSourceModelBindingModule()
         {

@@ -5,16 +5,17 @@
     using System.Linq;
     using System.Reflection;
 
-    using Bootstrapper;
-
+    using Nancy.Bootstrapper;
     using Nancy.ErrorHandling;
     using Nancy.TinyIoc;
 
     public class FakeDefaultNancyBootstrapper : DefaultNancyBootstrapper
     {
+        public IEnumerable<Type> OverriddenRegistrationTasks { get; set; }
+
         private NancyInternalConfiguration configuration;
 
-        protected override System.Collections.Generic.IEnumerable<ModuleRegistration> Modules
+        protected override IEnumerable<ModuleRegistration> Modules
         {
             get
             {
@@ -25,6 +26,14 @@
             : this(NancyInternalConfiguration.WithOverrides(b => b.StatusCodeHandlers = new List<Type>(new[] { typeof(DefaultStatusCodeHandler) })))
         {
             
+        }
+
+        protected override IEnumerable<Type> RegistrationTasks
+        {
+            get
+            {
+                return this.OverriddenRegistrationTasks ?? base.RegistrationTasks;
+            }
         }
 
         protected override IEnumerable<Func<Assembly, bool>> AutoRegisterIgnoredAssemblies

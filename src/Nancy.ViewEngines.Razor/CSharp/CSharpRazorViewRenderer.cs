@@ -5,7 +5,9 @@
     using System.Collections.Generic;
     using System.Web.Razor;
     using System.Web.Razor.Generator;
+
     using Microsoft.CSharp;
+    using Microsoft.CSharp.RuntimeBinder;
 
     using Nancy.Extensions;
 
@@ -27,12 +29,12 @@
             get { return "cshtml"; }
         }
 
-        
-
-        /// <summary>/// <summary>
+        /// <summary>
         /// Gets the <see cref="SetBaseTypeCodeGenerator"/> that should be used with the renderer.
         /// </summary>
         public Type ModelCodeGenerator { get; private set; }
+
+        /// <summary>
         /// Gets the host.
         /// </summary>
         public RazorEngineHost Host { get; private set; }
@@ -49,10 +51,10 @@
         {
             this.Assemblies = new List<string>
             {
-                typeof(Microsoft.CSharp.RuntimeBinder.Binder).GetAssemblyPath()
+                typeof(Binder).GetAssemblyPath()
             };
 
-            this.ModelCodeGenerator = typeof(CSharpModelCodeGenerator);
+            this.ModelCodeGenerator = typeof(ModelCodeGenerator);
 
             this.Provider = new CSharpCodeProvider();
 

@@ -2,11 +2,11 @@ namespace Nancy.Demo.Authentication.Forms
 {
     using System;
     using System.Dynamic;
-    using Nancy;
+
     using Nancy.Authentication.Forms;
     using Nancy.Extensions;
 
-    public class MainModule : NancyModule
+    public class MainModule : LegacyNancyModule
     {
         public MainModule()
         {

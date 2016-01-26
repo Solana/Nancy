@@ -2,8 +2,9 @@ namespace Nancy.Demo.Authentication.Forms.TestingDemo
 {
     using System;
     using System.IO;
+
+    using Nancy.Testing;
     using Nancy.Testing.Fakes;
-    using Testing;
 
     public class TestBootstrapper : FormsAuthBootstrapper
     {
@@ -16,11 +17,11 @@ namespace Nancy.Demo.Authentication.Forms.TestingDemo
 
                 var assemblyPath =
                     Path.GetDirectoryName(assemblyFilePath);
-                
-                var rootPath = 
+
+                var rootPath =
                     PathHelper.GetParent(assemblyPath, 3);
-                
-                rootPath = 
+
+                rootPath =
                     Path.Combine(rootPath, @"Nancy.Demo.Authentication.Forms");
 
                 FakeRootPathProvider.RootPath = rootPath;

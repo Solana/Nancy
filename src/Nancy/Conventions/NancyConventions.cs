@@ -2,11 +2,12 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Text;
-    using System.Globalization;
+
     using Nancy.Bootstrapper;
-    using ViewEngines;
+    using Nancy.ViewEngines;
 
     /// <summary>
     /// Nancy configurable conventions
@@ -75,9 +76,9 @@
             return new[]
             {
                 new InstanceRegistration(typeof(ViewLocationConventions), new ViewLocationConventions(this.ViewLocationConventions)),
-                new InstanceRegistration(typeof(StaticContentsConventions), new StaticContentsConventions(this.StaticContentsConventions)), 
+                new InstanceRegistration(typeof(StaticContentsConventions), new StaticContentsConventions(this.StaticContentsConventions)),
                 new InstanceRegistration(typeof(AcceptHeaderCoercionConventions), new AcceptHeaderCoercionConventions(this.AcceptHeaderCoercionConventions)), 
-                new InstanceRegistration(typeof(CultureConventions), new CultureConventions(this.CultureConventions)), 
+                new InstanceRegistration(typeof(CultureConventions), new CultureConventions(this.CultureConventions))
             };
         }
 
@@ -89,7 +90,7 @@
         {
             var defaultConventions =
                 AppDomainAssemblyTypeScanner.TypesOf<IConvention>(ScanMode.OnlyNancy);
-                
+
             this.conventions = defaultConventions
                 .Union(AppDomainAssemblyTypeScanner.TypesOf<IConvention>(ScanMode.ExcludeNancy))
                 .Select(t => (IConvention)Activator.CreateInstance(t));

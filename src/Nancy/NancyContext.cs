@@ -3,13 +3,14 @@ namespace Nancy
 {
     using System;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
+    using System.Security.Claims;
+    using Nancy.Configuration;
     using Nancy.Diagnostics;
     using Nancy.Responses.Negotiation;
     using Nancy.Routing;
-    using Nancy.Security;
     using Nancy.Validation;
-    using System.Globalization;
 
     /// <summary>
     /// Nancy context.
@@ -26,9 +27,10 @@ namespace Nancy
         public NancyContext()
         {
             this.Items = new Dictionary<string, object>();
-            this.Trace = new RequestTrace();
+            this.Trace = new DefaultRequestTrace();
             this.ViewBag = new DynamicDictionary();
-            
+            this.NegotiationContext = new NegotiationContext();
+
             // TODO - potentially additional logic to lock to ip etc?
             this.ControlPanelEnabled = true;
         }
@@ -39,12 +41,12 @@ namespace Nancy
         public IDictionary<string, object> Items { get; private set; }
 
         /// <summary>
-        /// Gets or sets the resolved route 
+        /// Gets or sets the resolved route
         /// </summary>
         public Route ResolvedRoute { get; set; }
 
         /// <summary>
-        /// Gets or sets the parameters for the resolved route 
+        /// Gets or sets the parameters for the resolved route
         /// </summary>
         public dynamic Parameters { get; set; }
 
@@ -61,8 +63,7 @@ namespace Nancy
             set
             {
                 this.request = value;
-                this.Trace.Method = request.Method;
-                this.Trace.RequestUrl = request.Url;
+                this.Trace.RequestData = value;
             }
         }
 
@@ -74,12 +75,12 @@ namespace Nancy
         /// <summary>
         /// Gets or sets the current user
         /// </summary>
-        public IUserIdentity CurrentUser { get; set; }
+        public ClaimsPrincipal CurrentUser { get; set; }
 
         /// <summary>
         /// Diagnostic request tracing
         /// </summary>
-        public RequestTrace Trace { get; set; }
+        public IRequestTrace Trace { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether control panel access is enabled for this request
@@ -106,9 +107,20 @@ namespace Nancy
         public CultureInfo Culture { get; set; }
 
         /// <summary>
-        /// Context of content negotiation (if relevent)
+        /// Context of content negotiation (if relevant)
         /// </summary>
         public NegotiationContext NegotiationContext { get; set; }
+
+        /// <summary>
+        /// Gets or sets the dynamic object used to locate text resources.
+        /// </summary>
+        public dynamic Text { get; set; }
+
+        /// <summary>
+        /// Gets or sets the <see cref="INancyEnvironment"/>.
+        /// </summary>
+        /// <value>An <see cref="INancyEnvironment"/> instance.</value>
+        public INancyEnvironment Environment { get; set; }
 
         /// <summary>
         /// Disposes any disposable items in the <see cref="Items"/> dictionary.

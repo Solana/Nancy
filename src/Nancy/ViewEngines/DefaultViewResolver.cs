@@ -1,6 +1,7 @@
 ﻿namespace Nancy.ViewEngines
 {
     using System;
+
     using Nancy.Conventions;
 
     /// <summary>
@@ -65,7 +66,7 @@
 
                 viewLocationContext.Context.Trace.TraceLog.WriteLog(x => x.AppendLine(string.Concat("[DefaultViewResolver] Attempting to locate view using convention '", conventionBasedViewName, "'")));
 
-                var locatedView = 
+                var locatedView =
                     this.viewLocator.LocateView(conventionBasedViewName, viewLocationContext.Context);
 
                 if (locatedView != null)

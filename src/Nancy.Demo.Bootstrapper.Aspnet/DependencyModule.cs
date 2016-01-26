@@ -1,9 +1,8 @@
 ﻿namespace Nancy.Demo.Bootstrapping.Aspnet
 {
-    using Nancy.AspNetBootstrapperDemo;
     using Nancy.Demo.Bootstrapping.Aspnet.Models;
 
-    public class DependencyModule : NancyModule
+    public class DependencyModule : LegacyNancyModule
     {
         private readonly IApplicationDependency applicationDependency;
         private readonly IRequestDependency requestDependency;
@@ -14,10 +13,10 @@
             this.requestDependency = requestDependency;
 
             Get["/"] = x => {
-                var model = 
+                var model =
                     new RatPackWithDependencyText
-                    { 
-                        FirstName = "Bob", 
+                    {
+                        FirstName = "Bob",
                         ApplicationDependencyText = this.applicationDependency.GetContent(),
                         RequestDependencyText = this.requestDependency.GetContent()
                     };

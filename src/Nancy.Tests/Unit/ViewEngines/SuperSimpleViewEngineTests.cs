@@ -4,7 +4,9 @@
     using System.Collections.Generic;
     using System.Dynamic;
     using System.Linq;
+
     using FakeItEasy;
+
     using Nancy.Tests.Fakes;
     using Nancy.ViewEngines.SuperSimpleViewEngine;
 
@@ -22,6 +24,215 @@
             this.viewEngine = new SuperSimpleViewEngine(Enumerable.Empty<ISuperSimpleViewEngineMatcher>());
         }
 
+        [Fact]
+        public void Should_expand_partial_inside_each_section()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['testing'];@EndEach</body></html>";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.GetTemplateCallback = (s, m) => "Hi";
+            var model = new List<string>() { "foo", "bar" };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>HiHi</body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_multiple_partials_inside_each_section()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['greeting'], @Partial['name'];@EndEach</body></html>";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.GetTemplateCallback = (s, m) =>
+            {
+                return (s.Equals("greeting")) ? "Hi" : "Nancy";
+            };
+            var model = new List<string>() { "foo", "bar" };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi, NancyHi, Nancy</body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_partial_inside_each_section_with_current_as_model()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['testing', @Current];@EndEach</body></html>";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.GetTemplateCallback = (s, m) => "Hi @Model ";
+            var model = new List<string>() { "foo", "bar" };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi foo Hi bar </body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_partial_inside_each_section_with_parameter_of_current_as_model()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['testing', @Current.Name];@EndEach</body></html>";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.GetTemplateCallback = (s, m) => "Hi @Model ";
+
+            dynamic foo = new ExpandoObject();
+            foo.Name = "foo";
+
+            dynamic bar = new ExpandoObject();
+            bar.Name = "bar";
+
+            var model = new List<ExpandoObject>() { foo, bar };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi foo Hi bar </body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_partial_inside_each_section_with_property_parameter_of_current_as_model()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['testing', @Current.FirstName];@EndEach</body></html>";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.GetTemplateCallback = (s, m) => "Hi @Model ";
+
+            var clark  = new PersonWithAgeField()
+            {
+                FirstName = "Clark",
+            };
+
+            var lois = new PersonWithAgeField()
+            {
+                FirstName = "Lois",
+            };
+
+            var model = new List<PersonWithAgeField>() { clark, lois };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi Clark Hi Lois </body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_partial_inside_each_section_with_field_parameter_of_current_as_model()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['testing', @Current.Age];@EndEach</body></html>";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.GetTemplateCallback = (s, m) => "Hi @Model ";
+
+            var clark  = new PersonWithAgeField()
+            {
+                Age = 28,
+            };
+
+            var lois = new PersonWithAgeField()
+            {
+                Age = 37,
+            };
+
+            var model = new List<Person>() { clark, lois };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi 28 Hi 37 </body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_multiple_partial_inside_each_section_with_parameter_of_current_as_model()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['first', @Current.Name];-@Partial['second', @Current.Name];@EndEach</body></html>";
+            
+            var fakeViewEngineHost = new FakeViewEngineHost
+            {
+                GetTemplateCallback = (s, m) =>
+                {
+                    return (s.Equals("first")) ?
+                        "Hi @Model" :
+                        "Hello @Model";
+                }
+            };
+
+            dynamic foo = new ExpandoObject();
+            foo.Name = "foo";
+
+            dynamic bar = new ExpandoObject();
+            bar.Name = "bar";
+
+            var model = new List<ExpandoObject>() { foo, bar };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi foo-Hello fooHi bar-Hello bar</body></html>", result);
+        }
+
+        [Fact]
+        public void Should_expand_multiple_partial_inside_each_section_with_different_parameter_of_current_as_model()
+        {
+            const string input = @"<html><head></head><body>@Each;@Partial['first', @Current.First];-@Partial['second', @Current.Last];@EndEach</body></html>";
+
+            var fakeViewEngineHost = new FakeViewEngineHost
+            {
+                GetTemplateCallback = (s, m) =>
+                {
+                    return (s.Equals("first")) ?
+                        "Hi @Model" :
+                        "Hello @Model";
+                }
+            };
+
+            dynamic foo = new ExpandoObject();
+            foo.First = "foo";
+            foo.Last = "bar";
+
+            dynamic bar = new ExpandoObject();
+            bar.First = "baz";
+            bar.Last = "bin";
+
+            var model = new List<ExpandoObject>() { foo, bar };
+
+            var result = viewEngine.Render(input, model, fakeViewEngineHost);
+
+            Assert.Equal(@"<html><head></head><body>Hi foo-Hello barHi baz-Hello bin</body></html>", result);
+        }
+
+        [Fact]
+        public void Should_evaluate_nested_conditionals()
+        {
+            // Given
+            const string input =
+                @"<html><head></head><body>@If.SayHello;Hey @If.ShowName;@Model.Name@If.Zalgo;HE COMES@EndIf;!@EndIf; Bye!@EndIf</body></html>";
+            var model = new
+            {
+                Name = "Bob",
+                SayHello = true,
+                ShowName = true,
+                Zalgo = false
+            };
+
+            // When
+            var output = viewEngine.Render(input, model, this.fakeHost);
+
+            // Then
+            Assert.Equal(@"<html><head></head><body>Hey Bob! Bye!</body></html>", output);
+        }
+
+        [Fact]
+        public void Should_evaluate_multiple_nested_conditionals()
+        {
+            // Given
+            const string input =
+                @"<html><head></head><body>@If.SayHello;Hey @If.ShowName;@Model.Name@If.Zalgo; HE COMES@EndIf;!@EndIf; Bye!@EndIf</body></html>";
+            var model = new
+            {
+                Name = "Bob",
+                SayHello = true,
+                ShowName = true,
+                Zalgo = true
+            };
+
+            // When
+            var output = viewEngine.Render(input, model, this.fakeHost);
+
+            // Then
+            Assert.Equal(@"<html><head></head><body>Hey Bob HE COMES! Bye!</body></html>", output);
+        }
 
         [Fact]
         public void Should_evaluate_current_conditional_inside_each()
@@ -52,7 +263,6 @@
             // Then
             Assert.Equal(@"<html><head></head><body>Yay Users!<ul><li>Bob:<b>Yay Greece!</b></li><li>Malin:</li></ul></body></html>", output);
         }
-
 
         [Fact]
         public void Should_evaluate_viewbag_as_dynamic_dictionary_conditional()
@@ -758,6 +968,19 @@
         }
 
         [Fact]
+        public void Should_expand_paths_in_attribute_values()
+        {
+            const string input = @"<script src='~/scripts/test.js'></script> <link href=""~/stylesheets/style.css"" />";
+            var fakeViewEngineHost = new FakeViewEngineHost();
+            fakeViewEngineHost.ExpandPathCallBack = s => s.Replace("~/", "/BasePath/");
+
+            var result = viewEngine.Render(input, null, fakeViewEngineHost);
+
+            Assert.Equal(@"<script src='/BasePath/scripts/test.js'></script> <link href=""/BasePath/stylesheets/style.css"" />", result);
+        }
+
+
+        [Fact]
         public void Should_expand_anti_forgery_tokens()
         {
             const string input = "<html><body><form>@AntiForgeryToken</form><body></html>";
@@ -936,7 +1159,6 @@
             Assert.Equal("Hello Frank!<div id='header'>\r\nHeader\r\n</div><div id='footer'>\r\nFooter\r\n</div>", result);
         }
 
-
         [Fact]
         public void Should_stuffrender_block_when_ifnot_statement_returns_false()
         {
@@ -1111,7 +1333,7 @@
 
             const string input = @"<html><head></head><body></body></html>";
 
-            var engine = new SuperSimpleViewEngine(new[] {extension1, extension2});
+            var engine = new SuperSimpleViewEngine(new[] { extension1, extension2 });
 
             // When
             var output = engine.Render(input, null, this.fakeHost);

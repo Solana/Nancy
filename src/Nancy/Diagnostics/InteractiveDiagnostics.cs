@@ -5,11 +5,13 @@
     using System.Linq;
     using System.Reflection;
 
+    using Nancy.Routing;
+
     public class InteractiveDiagnostics : IInteractiveDiagnostics
     {
         private readonly IDiagnosticsProvider[] providers;
 
-        private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy;
 
         public IEnumerable<InteractiveDiagnostic> AvailableDiagnostics { get; private set; }
 
@@ -19,14 +21,14 @@
             {
                 Type providerType = provider.GetType();
 
-                return providerType != typeof(Nancy.Diagnostics.TestingDiagnosticProvider) &
-                       providerType != typeof(Nancy.Routing.DefaultRouteCacheProvider);
+                return providerType != typeof(TestingDiagnosticProvider) &
+                       providerType != typeof(DefaultRouteCacheProvider);
             });
 
             if (customProvidersAvailable)
             {
                 // Exclude only the TestingDiagnosticProvider
-                this.providers = providers.Where(provider => provider.GetType() != typeof(Nancy.Diagnostics.TestingDiagnosticProvider)).ToArray();
+                this.providers = providers.Where(provider => provider.GetType() != typeof(TestingDiagnosticProvider)).ToArray();
             }
             else
             {
@@ -92,10 +94,14 @@
 
         private IEnumerable<InteractiveDiagnosticMethod> GetDiagnosticMethods(IDiagnosticsProvider diagnosticsProvider)
         {
+            var objectMethods = typeof(object).GetMethods().Select(x => x.Name).ToList();
+
             var methods = diagnosticsProvider.DiagnosticObject
                                              .GetType()
                                              .GetMethods(Flags)
-                                             .Where(mi => ! mi.IsSpecialName).ToArray();
+                                             .Where(x => !objectMethods.Contains(x.Name))
+                                             .Where(mi => !mi.IsSpecialName)
+                                             .ToArray();
 
             var diagnosticMethods = new List<InteractiveDiagnosticMethod>(methods.Length);
 

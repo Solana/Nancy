@@ -8,12 +8,14 @@
     /// </summary>
     public class NancyRazorErrorView : NancyRazorViewBase
     {
+        private readonly TraceConfiguration traceConfiguration;
+
         private const string DisableErrorTracesTrueMessage = "Error details are currently disabled. Please set <code>StaticConfiguration.DisableErrorTraces = false;</code> to enable.";
-        
+
         private static string template;
 
         /// <summary>
-        /// Gets or sets the template for rendinger errors.
+        /// Gets or sets the template for rendering errors.
         /// The token "[DETAILS]" will be replaced by the HTML for
         /// the actual error.
         /// </summary>
@@ -27,7 +29,10 @@
         /// Initializes a new instance of the <see cref="NancyRazorErrorView"/> class.
         /// </summary>
         /// <param name="message">The message.</param>
-        public NancyRazorErrorView(string message) {
+        /// <param name="traceConfiguration">A <see cref="TraceConfiguration"/> instance.</param>
+        public NancyRazorErrorView(string message, TraceConfiguration traceConfiguration)
+        {
+            this.traceConfiguration = traceConfiguration;
             this.Message = message;
         }
 
@@ -41,7 +46,7 @@
         /// </summary>
         public override void Execute()
         {
-            base.WriteLiteral(Template.Replace("[DETAILS]", StaticConfiguration.DisableErrorTraces ? DisableErrorTracesTrueMessage : this.Message));
+            base.WriteLiteral(Template.Replace("[DETAILS]", this.traceConfiguration.DisplayErrorTraces ? this.Message : DisableErrorTracesTrueMessage));
         }
 
         private static string LoadResource(string filename)

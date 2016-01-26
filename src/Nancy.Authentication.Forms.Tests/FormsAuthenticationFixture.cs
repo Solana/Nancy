@@ -2,13 +2,12 @@ namespace Nancy.Authentication.Forms.Tests
 {
     using System;
     using System.Linq;
+    using System.Security.Claims;
+    using System.Security.Principal;
     using System.Threading;
+    using FakeItEasy;
     using Bootstrapper;
     using Cryptography;
-    using FakeItEasy;
-    using Fakes;
-    using Helpers;
-    using Nancy.Security;
     using Nancy.Tests;
     using Nancy.Tests.Fakes;
     using Xunit;
@@ -22,19 +21,19 @@ namespace Nancy.Authentication.Forms.Tests
         private Guid userGuid;
 
         private string validCookieValue =
-            HttpUtility.UrlEncode("C+QzBqI2qSE6Qk60fmCsoMsQNLbQtCAFd5cpcy1xhu4=k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9");
+            "C+QzBqI2qSE6Qk60fmCsoMsQNLbQtCAFd5cpcy1xhu4=k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9";
 
         private string cookieWithNoHmac =
-            HttpUtility.UrlEncode("k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9");
+            "k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9";
 
         private string cookieWithEmptyHmac =
-            HttpUtility.UrlEncode("k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9");
+            "k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9";
 
         private string cookieWithInvalidHmac =
-            HttpUtility.UrlEncode("C+QzbqI2qSE6Qk60fmCsoMsQNLbQtCAFd5cpcy1xhu4=k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9");
+            "C+QzbqI2qSE6Qk60fmCsoMsQNLbQtCAFd5cpcy1xhu4=k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3sZwI0jB0KeVY9";
 
         private string cookieWithBrokenEncryptedData =
-            HttpUtility.UrlEncode("C+QzBqI2qSE6Qk60fmCsoMsQNLbQtCAFd5cpcy1xhu4=k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3spwI0jB0KeVY9");
+            "C+QzBqI2qSE6Qk60fmCsoMsQNLbQtCAFd5cpcy1xhu4=k+1IvvzkgKgfOK2/EgIr7Ut15f47a0fnlgH9W+Lzjv/a2Zkfxg3spwI0jB0KeVY9";
 
         private CryptographyConfiguration cryptographyConfiguration;
 
@@ -87,7 +86,7 @@ namespace Nancy.Authentication.Forms.Tests
         [Fact]
         public void Should_throw_with_null_application_pipelines_passed_to_enable()
         {
-            var result = Record.Exception(() => FormsAuthentication.Enable(null, this.config));
+            var result = Record.Exception(() => FormsAuthentication.Enable((IPipelines)null, this.config));
 
             result.ShouldBeOfType(typeof(ArgumentNullException));
         }
@@ -104,10 +103,10 @@ namespace Nancy.Authentication.Forms.Tests
         public void Should_throw_with_invalid_config_passed_to_enable()
         {
             var fakeConfig = A.Fake<FormsAuthenticationConfiguration>();
-            A.CallTo(() => fakeConfig.IsValid).Returns(false);
+            A.CallTo(() => fakeConfig.EnsureConfigurationIsValid()).Throws<InvalidOperationException>();
             var result = Record.Exception(() => FormsAuthentication.Enable(A.Fake<IPipelines>(), fakeConfig));
 
-            result.ShouldBeOfType(typeof(ArgumentException));
+            result.ShouldBeOfType(typeof(InvalidOperationException));
         }
 
         [Fact]
@@ -377,7 +376,7 @@ namespace Nancy.Authentication.Forms.Tests
             var result = FormsAuthentication.LogOutResponse();
 
             // Then
-            var cookie = result.Cookies.Where(c => c.Name == FormsAuthentication.FormsAuthenticationCookieName).First();
+            var cookie = result.Cookies.First(c => c.Name == FormsAuthentication.FormsAuthenticationCookieName);
             cookie.Value.ShouldBeEmpty();
             cookie.Expires.ShouldNotBeNull();
             (cookie.Expires < DateTime.Now).ShouldBeTrue();
@@ -403,7 +402,7 @@ namespace Nancy.Authentication.Forms.Tests
         {
             var fakePipelines = new Pipelines();
             var fakeMapper = A.Fake<IUserMapper>();
-            var fakeUser = new FakeUserIdentity {UserName = "Bob"};
+            var fakeUser = new ClaimsPrincipal(new GenericIdentity("Bob"));
             A.CallTo(() => fakeMapper.GetUserFromIdentifier(this.userGuid, this.context)).Returns(fakeUser);
             this.config.UserMapper = fakeMapper;
             FormsAuthentication.Enable(fakePipelines, this.config);
@@ -415,11 +414,27 @@ namespace Nancy.Authentication.Forms.Tests
         }
 
         [Fact]
+        public void Should_not_set_user_in_context_with_empty_cookie()
+        {
+            var fakePipelines = new Pipelines();
+            var fakeMapper = A.Fake<IUserMapper>();
+            var fakeUser = new ClaimsPrincipal(new GenericIdentity("Bob"));
+            A.CallTo(() => fakeMapper.GetUserFromIdentifier(this.userGuid, this.context)).Returns(fakeUser);
+            this.config.UserMapper = fakeMapper;
+            FormsAuthentication.Enable(fakePipelines, this.config);
+            this.context.Request.Cookies.Add(FormsAuthentication.FormsAuthenticationCookieName, string.Empty);
+
+            var result = fakePipelines.BeforeRequest.Invoke(this.context, new CancellationToken());
+
+            context.CurrentUser.ShouldBeNull();
+        }
+
+        [Fact]
         public void Should_not_set_user_in_context_with_invalid_hmac()
         {
             var fakePipelines = new Pipelines();
             var fakeMapper = A.Fake<IUserMapper>();
-            var fakeUser = new FakeUserIdentity { UserName = "Bob" };
+            var fakeUser = new ClaimsPrincipal(new GenericIdentity("Bob"));
             A.CallTo(() => fakeMapper.GetUserFromIdentifier(this.userGuid, this.context)).Returns(fakeUser);
             this.config.UserMapper = fakeMapper;
             FormsAuthentication.Enable(fakePipelines, this.config);
@@ -435,7 +450,7 @@ namespace Nancy.Authentication.Forms.Tests
         {
             var fakePipelines = new Pipelines();
             var fakeMapper = A.Fake<IUserMapper>();
-            var fakeUser = new FakeUserIdentity { UserName = "Bob" };
+            var fakeUser = new ClaimsPrincipal(new GenericIdentity("Bob"));
             A.CallTo(() => fakeMapper.GetUserFromIdentifier(this.userGuid, this.context)).Returns(fakeUser);
             this.config.UserMapper = fakeMapper;
             FormsAuthentication.Enable(fakePipelines, this.config);
@@ -451,7 +466,7 @@ namespace Nancy.Authentication.Forms.Tests
         {
             var fakePipelines = new Pipelines();
             var fakeMapper = A.Fake<IUserMapper>();
-            var fakeUser = new FakeUserIdentity { UserName = "Bob" };
+            var fakeUser = new ClaimsPrincipal(new GenericIdentity("Bob"));
             A.CallTo(() => fakeMapper.GetUserFromIdentifier(this.userGuid, this.context)).Returns(fakeUser);
             this.config.UserMapper = fakeMapper;
             FormsAuthentication.Enable(fakePipelines, this.config);
@@ -467,7 +482,7 @@ namespace Nancy.Authentication.Forms.Tests
         {
             var fakePipelines = new Pipelines();
             var fakeMapper = A.Fake<IUserMapper>();
-            var fakeUser = new FakeUserIdentity { UserName = "Bob" };
+            var fakeUser = new ClaimsPrincipal(new GenericIdentity("Bob"));
             A.CallTo(() => fakeMapper.GetUserFromIdentifier(this.userGuid, this.context)).Returns(fakeUser);
             this.config.UserMapper = fakeMapper;
             FormsAuthentication.Enable(fakePipelines, this.config);
@@ -705,6 +720,32 @@ namespace Nancy.Authentication.Forms.Tests
             //Then
             var cookie = result.Cookies.Where(c => c.Name == FormsAuthentication.FormsAuthenticationCookieName).First();
             cookie.Path.ShouldEqual(path);
+        }
+
+        [Fact]
+        public void Should_throw_with_null_module_passed_to_enable()
+        {
+            var result = Record.Exception(() => FormsAuthentication.Enable((INancyModule)null, this.config));
+
+            result.ShouldBeOfType(typeof(ArgumentNullException));
+        }
+
+        [Fact]
+        public void Should_throw_with_null_config_passed_to_enable_with_module()
+        {
+            var result = Record.Exception(() => FormsAuthentication.Enable(new FakeModule(), null));
+
+            result.ShouldBeOfType(typeof(ArgumentNullException));
+        }
+
+        class FakeModule : NancyModule
+        {
+            public FakeModule()
+            {
+                this.After = new AfterPipeline();
+                this.Before = new BeforePipeline();
+                this.OnError = new ErrorPipeline();
+            }
         }
     }
 }

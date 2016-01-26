@@ -14,10 +14,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -29,13 +29,14 @@
 namespace Nancy.Json
 {
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.IO;
     using System.Collections;
-    using System.Reflection;
+    using System.Collections.Generic;
     using System.ComponentModel;
+    using System.IO;
+    using System.Linq;
+    using System.Reflection;
+    using System.Text;
+
     using Nancy.Helpers;
 
     public class JavaScriptSerializer
@@ -43,6 +44,8 @@ namespace Nancy.Json
         internal const string SerializedTypeNameKey = "__type";
 
         List<IEnumerable<JavaScriptConverter>> _converterList;
+        List<IEnumerable<JavaScriptPrimitiveConverter>> _primitiveConverterList;
+
         int _maxJsonLength;
         int _recursionLimit;
         bool _retainCasing;
@@ -62,19 +65,19 @@ namespace Nancy.Json
         {
         }
 #else
-        internal static readonly JavaScriptSerializer DefaultSerializer = new JavaScriptSerializer(null, false, 102400, 100, false, true);
+        internal static readonly JavaScriptSerializer DefaultSerializer = new JavaScriptSerializer(null, false, 102400, 100, false, true, null, null);
 
         public JavaScriptSerializer()
-            : this(null, false, 102400, 100, false, true)
+            : this(null, false, 102400, 100, false, true, null, null)
         {
         }
 
         public JavaScriptSerializer(JavaScriptTypeResolver resolver)
-            : this(resolver, false, 102400, 100, false, true)
+            : this(resolver, false, 102400, 100, false, true, null, null)
         {
         }
 #endif
-        public JavaScriptSerializer(JavaScriptTypeResolver resolver, bool registerConverters, int maxJsonLength, int recursionLimit, bool retainCasing, bool iso8601DateFormat)
+        public JavaScriptSerializer(JavaScriptTypeResolver resolver, bool registerConverters, int maxJsonLength, int recursionLimit, bool retainCasing, bool iso8601DateFormat, IEnumerable<JavaScriptConverter> converters, IEnumerable<JavaScriptPrimitiveConverter> primitiveConverters)
         {
             _typeResolver = resolver;
             _maxJsonLength = maxJsonLength;
@@ -83,6 +86,9 @@ namespace Nancy.Json
             this.RetainCasing = retainCasing;
 
             _iso8601DateFormat = iso8601DateFormat;
+
+            if (registerConverters)
+                RegisterConverters(converters, primitiveConverters);
         }
 
 
@@ -137,6 +143,11 @@ namespace Nancy.Json
 
         internal object ConvertToType(Type type, object obj)
         {
+            var primitiveConverter = GetPrimitiveConverter(type);
+
+            if (primitiveConverter != null)
+                obj = primitiveConverter.Deserialize(obj, type, this);
+
             if (obj == null)
                 return null;
 
@@ -166,10 +177,7 @@ namespace Nancy.Json
                 return obj;
 
             if (type.IsEnum)
-                if (obj is string)
-                    return Enum.Parse(type, (string)obj, true);
-                else
-                    return Enum.ToObject(type, obj);
+                return ConvertToEnum(obj, type);
 
             TypeConverter c = TypeDescriptor.GetConverter(type);
             if (c.CanConvertFrom(sourceType))
@@ -181,11 +189,16 @@ namespace Nancy.Json
             }
 
 
+            if (type == typeof(DateTimeOffset) && obj is string)
+            {
+                return DateTimeOffset.Parse((string)obj);
+            }
+
             if ((type.IsGenericType) && (type.GetGenericTypeDefinition() == typeof(Nullable<>)))
             {
                 /*
-                 * Take care of the special case whereas in JSON an empty string ("") really means 
-                 * an empty value 
+                 * Take care of the special case whereas in JSON an empty string ("") really means
+                 * an empty value
                  * (see: https://bugzilla.novell.com/show_bug.cgi?id=328836)
                  */
                 string s = obj as String;
@@ -194,8 +207,13 @@ namespace Nancy.Json
                     if (s == string.Empty)
                         return null;
                 }
-                else //It is not string at all, convert to Nullable<> type, from int to uint for example
-                    return Convert.ChangeType (obj, type.GetGenericArguments ()[0]);
+
+                var underlyingType = type.GetGenericArguments()[0];
+
+                if (underlyingType.IsEnum)
+                    return ConvertToEnum(obj, underlyingType);
+
+                return Convert.ChangeType(obj, underlyingType);
             }
 
             return Convert.ChangeType(obj, type);
@@ -252,7 +270,7 @@ namespace Nancy.Json
 
         static readonly Type typeofObject = typeof(object);
         static readonly Type typeofGenList = typeof(List<>);
-        
+
 
         object ConvertToList(ArrayList col, Type type)
         {
@@ -316,7 +334,7 @@ namespace Nancy.Json
                     Type[] arguments = type.GetGenericArguments();
                     if (arguments == null || arguments.Length != 2 || (arguments[0] != typeof(object) && arguments[0] != typeof(string) && arguments[0] != typeof(Guid)))
                         throw new InvalidOperationException(
-                            "Type '" + type + "' is not not supported for serialization/deserialization of a dictionary, keys must be strings, guids or objects.");
+                            "Type '" + type + "' is not supported for serialization/deserialization of a dictionary, keys must be strings, guids or objects.");
                     if (type.IsAbstract)
                     {
                         Type dictType = typeof(Dictionary<,>);
@@ -324,6 +342,14 @@ namespace Nancy.Json
                     }
 
                     isDictionaryWithGuidKey = arguments[0] == typeof(Guid);
+                }
+                else
+                {
+                    var converter = GetConverter(genericTypeDefinition);
+                    if (converter != null)
+                        return converter.Deserialize(
+                            EvaluateDictionary(dict),
+                            type, this);
                 }
             }
             else if (type.IsAssignableFrom(typeof(IDictionary)))
@@ -337,7 +363,7 @@ namespace Nancy.Json
                 if (target is IDictionary)
                 {
                     Type valueType = ReflectionUtils.GetTypedDictionaryValueType(type);
-                    if (value != null && valueType == typeof(System.Object))
+                    if (value != null && valueType == typeof(Object))
                         valueType = value.GetType();
 
                     if (isDictionaryWithGuidKey)
@@ -384,6 +410,14 @@ namespace Nancy.Json
             }
 
             return target;
+        }
+
+        object ConvertToEnum(object obj, Type type)
+        {
+            if (obj is string)
+                return Enum.Parse(type, (string)obj, true);
+            else
+                return Enum.ToObject(type, obj);
         }
 
         Type ResolveGenericInterfaceToType(Type type)
@@ -460,12 +494,45 @@ namespace Nancy.Json
             _converterList.Add(converters);
         }
 
+        public void RegisterConverters(IEnumerable<JavaScriptPrimitiveConverter> primitiveConverters)
+        {
+            if (primitiveConverters == null)
+                throw new ArgumentNullException("primitiveConverters");
+
+            if (_primitiveConverterList == null)
+                _primitiveConverterList = new List<IEnumerable<JavaScriptPrimitiveConverter>>();
+            _primitiveConverterList.Add(primitiveConverters);
+        }
+
+        public void RegisterConverters(IEnumerable<JavaScriptConverter> converters, IEnumerable<JavaScriptPrimitiveConverter> primitiveConverters)
+        {
+            if (converters != null)
+                RegisterConverters(converters);
+
+            if (primitiveConverters != null)
+                RegisterConverters(primitiveConverters);
+        }
+
         internal JavaScriptConverter GetConverter(Type type)
         {
             if (_converterList != null)
                 for (int i = 0; i < _converterList.Count; i++)
                 {
                     foreach (JavaScriptConverter converter in _converterList[i])
+                        foreach (Type supportedType in converter.SupportedTypes)
+                            if (supportedType.IsAssignableFrom(type))
+                                return converter;
+                }
+
+            return null;
+        }
+
+        internal JavaScriptPrimitiveConverter GetPrimitiveConverter(Type type)
+        {
+            if (_primitiveConverterList != null)
+                for (int i = 0; i < _primitiveConverterList.Count; i++)
+                {
+                    foreach (JavaScriptPrimitiveConverter converter in _primitiveConverterList[i])
                         foreach (Type supportedType in converter.SupportedTypes)
                             if (supportedType.IsAssignableFrom(type))
                                 return converter;

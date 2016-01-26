@@ -2,14 +2,17 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Security.Claims;
     using System.Text;
     using System.Threading;
+
     using FakeItEasy;
-    using Nancy.Security;
-    using Nancy.Tests;
-    using Xunit;
+
     using Nancy.Bootstrapper;
+    using Nancy.Tests;
     using Nancy.Tests.Fakes;
+
+    using Xunit;
 
     public class BasicAuthenticationFixture
     {
@@ -70,6 +73,26 @@
         {
             // Given, When
             var result = Record.Exception(() => BasicAuthentication.Enable(new FakeModule(), null));
+
+            // Then
+            result.ShouldBeOfType(typeof(ArgumentNullException));
+        }
+
+        [Fact]
+        public void Should_throw_with_null_pipeline_passed_to_enable_with_config()
+        {
+            // Given, When
+            var result = Record.Exception(() => BasicAuthentication.Enable((IPipelines)null, this.config));
+
+            // Then
+            result.ShouldBeOfType(typeof(ArgumentNullException));
+        }
+
+        [Fact]
+        public void Should_throw_with_null_module_passed_to_enable_with_config()
+        {
+            // Given, When
+            var result = Record.Exception(() => BasicAuthentication.Enable((INancyModule)null, this.config));
 
             // Then
             result.ShouldBeOfType(typeof(ArgumentNullException));
@@ -249,7 +272,7 @@
             var fakePipelines = new Pipelines();
 
             var validator = A.Fake<IUserValidator>();
-            var fakeUser = A.Fake<IUserIdentity>();
+            var fakeUser = A.Fake<ClaimsPrincipal>();
             A.CallTo(() => validator.Validate("foo", "bar")).Returns(fakeUser);
 
             var cfg = new BasicAuthenticationConfiguration(validator, "realm");

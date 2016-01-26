@@ -2,17 +2,18 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Drawing;
     using System.IO;
     using System.Linq;
+    using Nancy.Configuration;
 
     /// <summary>
     /// Application startup task that attempts to locate a favicon. The startup will first scan all
     /// folders in the path defined by the provided <see cref="IRootPathProvider"/> and if it cannot
-    /// fine one, it will fall back and use the default favicon that is embedded in the Nancy.dll file.
+    /// find one, it will fall back and use the default favicon that is embedded in the Nancy.dll file.
     /// </summary>
     public class FavIconApplicationStartup : IApplicationStartup
     {
+        private static TraceConfiguration traceConfiguration;
         private static IRootPathProvider rootPathProvider;
         private static byte[] favIcon;
 
@@ -21,9 +22,11 @@
         /// provided <see cref="IRootPathProvider"/> instance.
         /// </summary>
         /// <param name="rootPathProvider">The <see cref="IRootPathProvider"/> that should be used to scan for a favicon.</param>
-        public FavIconApplicationStartup(IRootPathProvider rootPathProvider)
+        /// <param name="environment">An <see cref="INancyEnvironment"/> instance.</param>
+        public FavIconApplicationStartup(IRootPathProvider rootPathProvider, INancyEnvironment environment)
         {
             FavIconApplicationStartup.rootPathProvider = rootPathProvider;
+            FavIconApplicationStartup.traceConfiguration = environment.GetValue<TraceConfiguration>();
         }
 
         /// <summary>
@@ -68,36 +71,35 @@
                 return null;
             }
 
-            byte[] icon = null;
             var extensions = new[] { "ico", "png" };
 
-            var locatedFavIcons = extensions.SelectMany(extension => Directory
-                .EnumerateFiles(rootPathProvider.GetRootPath(), string.Concat("favicon.", extension), SearchOption.AllDirectories))
-                .ToArray();
-
-            if (locatedFavIcons.Any())
+            var locatedFavIcon = extensions.SelectMany(EnumerateFiles).FirstOrDefault();
+            if (locatedFavIcon == null)
             {
-                try
-                {
-                    var image =
-                        Image.FromFile(locatedFavIcons.First());
-
-                    var converter = new ImageConverter();
-
-                    icon = (byte[])converter.ConvertTo(image, typeof(byte[]));
-                }
-                catch (Exception e)
-                {
-                    if (!StaticConfiguration.DisableErrorTraces)
-                    {
-                        throw new InvalidDataException("Unable to load favicon, please check the format is compatible with GDI+", e);
-                    }
-
-                    return null;
-                }
+                return null;
             }
 
-            return icon;
+            try
+            {
+                return File.ReadAllBytes(locatedFavIcon);
+            }
+            catch (Exception e)
+            {
+                if (!traceConfiguration.Enabled)
+                {
+                    throw new InvalidDataException("Unable to load favicon", e);
+                }
+
+                return null;
+            }
+        }
+
+        private static IEnumerable<string> EnumerateFiles(string extension)
+        {
+            var rootPath = rootPathProvider.GetRootPath();
+            var fileName = string.Concat("favicon.", extension);
+
+            return Directory.EnumerateFiles(rootPath, fileName, SearchOption.AllDirectories);
         }
 
         private static byte[] ScanForFavIcon()

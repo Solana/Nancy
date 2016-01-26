@@ -8,28 +8,31 @@
     <description>Enables using the Razor view engine with nancy</description>
     <summary>Nancy is a lightweight web framework for the .Net platform, inspired by Sinatra. Nancy aim at delivering a low ceremony approach to building light, fast web applications.</summary>
     <language>en-US</language>
-	<copyright>Andreas Håkansson, Steven Robbins and contributors</copyright>
-	<iconUrl>http://nancyfx.org/nancy-nuget.png</iconUrl>
+    <copyright>Andreas Håkansson, Steven Robbins and contributors</copyright>
+    <iconUrl>http://nancyfx.org/nancy-nuget.png</iconUrl>
     <licenseUrl>https://github.com/NancyFx/Nancy/blob/master/license.txt</licenseUrl>
     <projectUrl>http://nancyfx.org</projectUrl>
     <dependencies>
-      <dependency id="Nancy" />
-      <dependency id="System.Web.Razor.Unofficial" />
-    </dependencies> 
+      <group>
+        <dependency id="Nancy" />
+        <dependency id="Microsoft.AspNet.Razor" />
+      </group>
+      <group targetFramework="net40">
+        <dependency id="Nancy" />
+        <dependency id="Microsoft.AspNet.Razor" version="2.0.30506" />
+      </group>
+    </dependencies>
     <tags>Nancy Viewengine Razor</tags>
   </metadata>
   <files>
-    <file src="build\binaries\Nancy.Viewengines.Razor.dll" target="lib\net40" />
-    <file src="build\binaries\Nancy.Viewengines.Razor.pdb" target="lib\net40" />
-    <file src="build\binaries\Nancy.Viewengines.Razor.XML" target="lib\net40" />
+    <file src="build\binaries\Nancy.Viewengines.Razor.dll" target="lib\net45" />
+    <file src="build\binaries\Nancy.Viewengines.Razor.pdb" target="lib\net45" />
+    <file src="build\binaries\Nancy.Viewengines.Razor.XML" target="lib\net45" />
     <file src="build\binaries\Nancy.Viewengines.Razor.BuildProviders.dll" target="BuildProviders" />
     <file src="build\binaries\Nancy.Viewengines.Razor.BuildProviders.pdb" target="BuildProviders" />
     <file src="build\binaries\Nancy.Viewengines.Razor.BuildProviders.XML" target="BuildProviders" />
     <file src="src\Nancy.Viewengines.Razor\web.config.transform" target="content" />
     <file src="src\Nancy.Viewengines.Razor\app.config.transform" target="content" />
-    <file src="src\Nancy.Viewengines.Razor\**\*.cs" target="src" />
-    <file src="build\binaries\install.ps1" target="Tools\install.ps1" />
-    <file src="build\binaries\uninstall.ps1" target="Tools\uninstall.ps1" />
-    <file src="build\binaries\GetNancyRazorBuildProviderPostBuildCmd.ps1" target="Tools\GetNancyRazorBuildProviderPostBuildCmd.ps1" />
+    <file src="src\Nancy.Viewengines.Razor\targets\*.*" target="build" />
   </files>
 </package>

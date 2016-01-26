@@ -7,13 +7,18 @@
     using System.IO;
     using System.Linq;
     using System.Reflection;
+    using System.Runtime.CompilerServices;
     using System.Text;
     using System.Web.Razor;
-    using System.Web.Razor.Parser.SyntaxTree;
+
+    using Microsoft.CSharp;
 
     using Nancy.Bootstrapper;
+    using Nancy.Configuration;
     using Nancy.Helpers;
     using Nancy.Responses;
+    using Nancy.ViewEngines.Razor.CSharp;
+    using Nancy.ViewEngines.Razor.VisualBasic;
 
     /// <summary>
     /// View engine for rendering razor views.
@@ -23,6 +28,7 @@
         private readonly IRazorConfiguration razorConfiguration;
         private readonly IEnumerable<IRazorViewRenderer> viewRenderers;
         private readonly object compileLock = new object();
+        private readonly TraceConfiguration traceConfiguration;
 
         /// <summary>
         /// Gets the extensions file extensions that are supported by the view engine.
@@ -38,15 +44,17 @@
         /// Initializes a new instance of the <see cref="RazorViewEngine"/> class.
         /// </summary>
         /// <param name="configuration">The <see cref="IRazorConfiguration"/> that should be used by the engine.</param>
-        public RazorViewEngine(IRazorConfiguration configuration)
+        /// <param name="environment">An <see cref="INancyEnvironment"/> instance.</param>
+        public RazorViewEngine(IRazorConfiguration configuration, INancyEnvironment environment)
         {
             this.viewRenderers = new List<IRazorViewRenderer>
             {
-                new CSharp.CSharpRazorViewRenderer(),
-                new VisualBasic.VisualBasicRazorViewRenderer()
+                new CSharpRazorViewRenderer(),
+                new VisualBasicRazorViewRenderer()
             };
 
             this.razorConfiguration = configuration;
+            this.traceConfiguration = environment.GetValue<TraceConfiguration>();
 
             foreach (var renderer in this.viewRenderers)
             {
@@ -115,7 +123,15 @@
 
                 while (!root)
                 {
-                    view = this.GetViewInstance(renderContext.LocateView(layout, model), renderContext, referencingAssembly, model);
+                    var viewLocation =
+                        renderContext.LocateView(layout, model);
+
+                    if (viewLocation == null)
+                    {
+                        throw new InvalidOperationException("Unable to locate layout: " + layout);
+                    }
+
+                    view = this.GetViewInstance(viewLocation, renderContext, referencingAssembly, model);
 
                     view.ExecuteView(body, sectionContents);
 
@@ -199,12 +215,13 @@
             var outputAssemblyName =
                 Path.Combine(Path.GetTempPath(), String.Format("Temp_{0}.dll", Guid.NewGuid().ToString("N")));
 
-            var modelType =
-                FindModelType(razorResult.Document, passedModelType, viewRenderer.ModelCodeGenerator);
+            var modelType = (Type)razorResult.GeneratedCode.Namespaces[0].Types[0].UserData["ModelType"]
+                            ?? passedModelType
+                            ?? typeof(object);
 
             var assemblies = new List<string>
             {
-                GetAssemblyPath(typeof(System.Runtime.CompilerServices.CallSite)),
+                GetAssemblyPath(typeof(CallSite)),
                 GetAssemblyPath(typeof(IHtmlString)),
                 GetAssemblyPath(Assembly.GetExecutingAssembly()),
                 GetAssemblyPath(modelType)
@@ -266,27 +283,27 @@
                                         templateLines.Aggregate((s1, s2) => s1 + "<br/>" + s2),
                                         compilationSource.Aggregate((s1, s2) => s1 + "<br/>Line " + lineNumber++ + ":\t" + s2));
 
-                return () => new NancyRazorErrorView(errorDetails);
+                return () => new NancyRazorErrorView(errorDetails, this.traceConfiguration);
             }
 
             var assembly = Assembly.LoadFrom(outputAssemblyName);
             if (assembly == null)
             {
                 const string error = "Error loading template assembly";
-                return () => new NancyRazorErrorView(error);
+                return () => new NancyRazorErrorView(error, this.traceConfiguration);
             }
 
             var type = assembly.GetType("RazorOutput.RazorView");
             if (type == null)
             {
                 var error = String.Format("Could not find type RazorOutput.Template in assembly {0}", assembly.FullName);
-                return () => new NancyRazorErrorView(error);
+                return () => new NancyRazorErrorView(error, this.traceConfiguration);
             }
 
             if (Activator.CreateInstance(type) as INancyRazorView == null)
             {
                 const string error = "Could not construct RazorOutput.Template or it does not inherit from INancyRazorView";
-                return () => new NancyRazorErrorView(error);
+                return () => new NancyRazorErrorView(error, this.traceConfiguration);
             }
 
             return () => (INancyRazorView)Activator.CreateInstance(type);
@@ -335,95 +352,12 @@
                 var currentLine = templateReader.ReadLine();
                 while (currentLine != null)
                 {
-                    templateLines.Add(Helpers.HttpUtility.HtmlEncode(currentLine));
+                    templateLines.Add(HttpUtility.HtmlEncode(currentLine));
 
                     currentLine = templateReader.ReadLine();
                 }
             }
             return templateLines.ToArray();
-        }
-
-        /// <summary>
-        /// Tries to find the model type from the document
-        /// So documents using @model will actually be able to reference the model type
-        /// </summary>
-        /// <param name="block">The document</param>
-        /// <param name="passedModelType">The model type from the base class</param>
-        /// <param name="modelCodeGenerator">The model code generator</param>
-        /// <returns>The model type, if discovered, or the passedModelType if not</returns>
-        private static Type FindModelType(Block block, Type passedModelType, Type modelCodeGenerator)
-        {
-            var modelBlock =
-                block.Flatten().FirstOrDefault(b => b.CodeGenerator.GetType() == modelCodeGenerator);
-
-            if (modelBlock == null)
-            {
-                return passedModelType ?? typeof(object);
-            }
-
-            if (string.IsNullOrEmpty(modelBlock.Content))
-            {
-                return passedModelType ?? typeof(object);
-            }
-
-            var discoveredModelType = modelBlock.Content.Trim();
-
-            var modelType = Type.GetType(discoveredModelType);
-
-            if (modelType != null)
-            {
-                return modelType;
-            }
-
-            modelType = AppDomainAssemblyTypeScanner.Types.FirstOrDefault(t => t.FullName == discoveredModelType);
-
-            if (modelType != null)
-            {
-                return modelType;
-            }
-
-            modelType = AppDomainAssemblyTypeScanner.Types.FirstOrDefault(t => t.Name == discoveredModelType);
-
-            if (modelType != null)
-            {
-                return modelType;
-            }
-
-            throw new NotSupportedException(string.Format(
-                                                "Unable to discover CLR Type for model by the name of {0}.\n\nTry using a fully qualified type name and ensure that the assembly is added to the configuration file.\n\nAppDomain Assemblies:\n\t{1}.\n\nCurrent ADATS assemblies:\n\t{2}.\n\nAssemblies in directories\n\t{3}",
-                                                discoveredModelType,
-                                                AppDomain.CurrentDomain.GetAssemblies().Select(a => a.FullName).Aggregate((n1, n2) => n1 + "\n\t" + n2),
-                                                AppDomainAssemblyTypeScanner.Assemblies.Select(a => a.FullName).Aggregate((n1, n2) => n1 + "\n\t" + n2),
-                                                GetAssembliesInDirectories().Aggregate((n1, n2) => n1 + "\n\t" + n2)));
-        }
-
-        private static IEnumerable<String> GetAssembliesInDirectories()
-        {
-            return GetAssemblyDirectories().SelectMany(d => Directory.GetFiles(d, "*.dll"));
-        }
-
-        /// <summary>
-        /// Returns the directories containing dll files. It uses the default convention as stated by microsoft.
-        /// </summary>
-        /// <see cref="http://msdn.microsoft.com/en-us/library/system.appdomainsetup.privatebinpathprobe.aspx"/>
-        private static IEnumerable<string> GetAssemblyDirectories()
-        {
-            var privateBinPathDirectories = AppDomain.CurrentDomain.SetupInformation.PrivateBinPath == null
-                                                ? new string[] { }
-                                                : AppDomain.CurrentDomain.SetupInformation.PrivateBinPath.Split(';');
-
-            foreach (var privateBinPathDirectory in privateBinPathDirectories)
-            {
-                if (!string.IsNullOrWhiteSpace(privateBinPathDirectory))
-                {
-                    yield return privateBinPathDirectory;
-                }
-            }
-
-            if (AppDomain.CurrentDomain.SetupInformation.PrivateBinPathProbe == null)
-            {
-                yield return AppDomain.CurrentDomain.SetupInformation.ApplicationBase;
-            }
         }
 
         private static void AddModelNamespace(GeneratorResults razorResult, Type modelType)

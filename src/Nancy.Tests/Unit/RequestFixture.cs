@@ -6,6 +6,7 @@ namespace Nancy.Tests.Unit
     using System.Linq;
     using System.Text;
     using FakeItEasy;
+    using Nancy.Helpers;
     using Nancy.IO;
     using Xunit;
     using Xunit.Extensions;
@@ -309,7 +310,7 @@ namespace Nancy.Tests.Unit
             // Given
             StaticConfiguration.CaseSensitive = false;
             var memory =
-                new MemoryStream(BuildMultipartFormValues(new Dictionary<string, string>(StringComparer.InvariantCulture)
+                new MemoryStream(BuildMultipartFormValues(new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     { "key", "value" },
                     { "KEY", "VALUE" }
@@ -335,7 +336,7 @@ namespace Nancy.Tests.Unit
             // Given
             StaticConfiguration.CaseSensitive = true;
             var memory =
-                new MemoryStream(BuildMultipartFormValues(new Dictionary<string, string>(StringComparer.InvariantCulture)
+                new MemoryStream(BuildMultipartFormValues(new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     { "key", "value" },
                     { "KEY", "VALUE" }
@@ -542,7 +543,7 @@ namespace Nancy.Tests.Unit
             var cookieData = "Y+M3rcC/7ssXvHTx9pwCbwQVV4g=sp0hUZVApYgGbKZIU4bvXbBCVl9fhSEssEXSGdrt4jVag6PO1oed8lSd+EJD1nzWx4OTTCTZKjYRWeHE97QVND4jJIl+DuKRgJnSl3hWI5gdgGjcxqCSTvMOMGmW3NHLVyKpajGD8tq1DXhXMyXHjTzrCAYl8TGzwyJJGx/gd7VMJeRbAy9JdHOxEUlCKUnPneWN6q+/ITFryAa5hAdfcjXmh4Fgym75whKOMkWO+yM2icdsciX0ShcvnEQ/bXcTHTya6d7dJVfZl7qQ8AgIQv8ucQHxD3NxIvHNPBwms2ClaPds0HG5N+7pu7eMSFZjUHpDrrCnFvYN+JDiG3GMpf98LuCCvxemvipJo2MUkY4J1LvaDFoWA5tIxAfItZJkSIW2d8JPDwFk8OHJy8zhyn8AjD2JFqWaUZr4y9KZOtgI0V0Qlq0mS3mDSlLn29xapgoPHBvykwQjR6TwF2pBLpStsfZa/tXbEv2mc3VO3CnErIA1lEfKNqn9C/Dw6hqW";
             var headers = new Dictionary<string, IEnumerable<string>>();
             var cookies = new List<string>();
-            cookies.Add(string.Format("{0}={1}", cookieName, cookieData));
+            cookies.Add(string.Format("{0}={1}", cookieName, HttpUtility.UrlEncode(cookieData)));
             headers.Add("cookie", cookies);
             var newUrl = new Url
             {
@@ -593,6 +594,25 @@ namespace Nancy.Tests.Unit
         }
 
         [Fact]
+        public void Should_split_cookie_in_two_parts_with_httponly_and_secure_attribute_ignoring_case()
+        {
+            // Given, when
+            const string cookieName = "path";
+            const string cookieData = "/";
+            var headers = new Dictionary<string, IEnumerable<string>>();
+            var cookies = new List<string> { string.Format("{0}={1}; httponly; secure", cookieName, cookieData) };
+            headers.Add("cookie", cookies);
+            var newUrl = new Url
+            {
+                Path = "/"
+            };
+            var request = new Request("GET", newUrl, null, headers);
+
+            // Then
+            request.Cookies[cookieName].ShouldEqual(cookieData);
+        }
+
+        [Fact]
         public void Should_split_cookie_in_two_parts_with_httponly_attribute()
         {
             // Given, when
@@ -609,6 +629,27 @@ namespace Nancy.Tests.Unit
 
             // Then
             request.Cookies[cookieName].ShouldEqual(cookieData);
+        }
+
+        [Fact]
+        public void Should_add_attribute_in_cookie_as_empty_value()
+        {
+          // Given, when
+          const string cookieName = "path";
+          const string cookieData = "/";
+          const string cookieAttribute = "SomeAttribute";
+          var headers = new Dictionary<string, IEnumerable<string>>();
+          var cookies = new List<string> { string.Format("{0}={1}; {2}", cookieName, cookieData, cookieAttribute) };
+          headers.Add("cookie", cookies);
+          var newUrl = new Url
+          {
+            Path = "/"
+          };
+          var request = new Request("GET", newUrl, null, headers);
+
+          // Then
+          request.Cookies[cookieName].ShouldEqual(cookieData);
+          request.Cookies[cookieAttribute].ShouldEqual(string.Empty);
         }
 
         [Fact]
@@ -744,6 +785,33 @@ namespace Nancy.Tests.Unit
             var request = new Request("GET", "", "http");
 
             request.Path.ShouldEqual("/");
+        }
+
+        [Fact]
+        public void Should_replace_value_of_query_key_without_value_with_true()
+        {
+            // Given
+            var memory = CreateRequestStream();
+
+            // When
+            var request = new Request("GET", new Url { Path = "/", Scheme = "http", Query = "key1" }, memory);
+
+            // Then
+            ((bool)request.Query.key1).ShouldBeTrue();
+            ((string)request.Query.key1).ShouldEqual("key1"); 
+        }
+
+        [Fact]
+        public void Should_not_replace_equal_key_value_query_with_bool()
+        {
+            // Given
+            var memory = CreateRequestStream();
+
+            // When
+            var request = new Request("GET", new Url { Path = "/", Scheme = "http", Query = "key1=key1" }, memory);
+
+            // Then
+            ShouldAssertExtensions.ShouldBeOfType<string>(request.Query["key1"].Value);
         }
 
         private static RequestStream CreateRequestStream()

@@ -3,18 +3,20 @@
     using System;
     using System.Text.RegularExpressions;
 
+    using MarkdownSharp;
+
     public static class MarkdownViewengineRender
     {
         /// <summary>
         /// A regex for removing paragraph tags that the parser inserts on unknown content such as @Section['Content']
         /// </summary>
         /// <remarks>
-        ///  <p>		- matches the literal string "<p>"
+        ///  &lt;p>		- matches the literal string "&lt;p>"
         ///  (		- creates a capture group, so that we can get the text back by backreferencing in our replacement string
         ///  @		- matches the literal string "@"
-        ///  [^<]*	- matches any character other than the "<" character and does this any amount of times
+        ///  [^&lt;]*	- matches any character other than the "&lt;" character and does this any amount of times
         ///  )		- ends the capture group
-        ///  </p>	- matches the literal string "</p>"
+        ///  &lt;/p>	- matches the literal string "&lt;/p>"
         /// </remarks>
         private static readonly Regex ParagraphSubstitution = new Regex("<p>(@[^<]*)</p>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -43,14 +45,14 @@
             var footer =
                 templateContent.Substring(templateContent.IndexOf("</body>", StringComparison.OrdinalIgnoreCase));
 
-            var parser = new MarkdownSharp.Markdown();
+            var parser = new Markdown();
 
             var html = parser.Transform(toConvert.Trim());
 
             var serverHtml = ParagraphSubstitution.Replace(html, "$1");
 
             //TODO: The "Replace" is simply for unit testing HTML/MD strings. Probably needs improving
-            return string.Concat(header, serverHtml, footer).Replace("\r\n", "").Replace("\n", "").Replace("\r", "");  
+            return string.Concat(header, serverHtml, footer).Replace("\r\n", "").Replace("\n", "").Replace("\r", "");
         }
     }
 }

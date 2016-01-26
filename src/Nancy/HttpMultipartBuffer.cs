@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-namespace Nancy
+﻿namespace Nancy
 {
     using System;
     using System.Linq;
@@ -49,9 +47,9 @@ namespace Nancy
         }
 
         /// <summary>
-        /// Gets the the number of bytes that can be stored in the buffer.
+        /// Gets the number of bytes that can be stored in the buffer.
         /// </summary>
-        /// <value>The number of butes that can be stored in the buffer.</value>
+        /// <value>The number of bytes that can be stored in the buffer.</value>
         public int Length
         {
             get { return this.buffer.Length; }

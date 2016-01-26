@@ -1,9 +1,8 @@
 namespace Nancy.Tests.Unit.ViewEngines
 {
-    using System;
     using System.Collections.Generic;
-    using System.Linq;
     using FakeItEasy;
+    using Nancy.Configuration;
     using Nancy.ViewEngines;
     using Xunit;
 
@@ -11,8 +10,8 @@ namespace Nancy.Tests.Unit.ViewEngines
     {
         private IList<ViewLocationResult> views;
         private readonly IViewCache viewCache;
-
         private readonly IViewLocator viewLocator;
+        private readonly INancyEnvironment environment;
 
         public ViewEngineStartupFixture()
         {
@@ -29,8 +28,10 @@ namespace Nancy.Tests.Unit.ViewEngines
             var viewEngine = A.Fake<IViewEngine>();
             A.CallTo(() => viewEngine.Extensions).Returns(new[] { "liquid" });
 
-            this.viewLocator = new DefaultViewLocator(viewLocationProvider, new[] { viewEngine });
+            this.environment = new DefaultNancyEnvironment();
+            this.environment.AddValue(ViewConfiguration.Default);
 
+            this.viewLocator = new DefaultViewLocator(viewLocationProvider, new[] { viewEngine }, this.environment);
             this.viewCache = A.Fake<IViewCache>();
         }
 

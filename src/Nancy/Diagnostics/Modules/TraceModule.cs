@@ -12,17 +12,17 @@
         {
             this.sessionProvider = sessionProvider;
 
-            Get["/"] = _ =>
+            Get["/"] = async (_, __) =>
             {
                 return View["RequestTracing"];
             };
 
-            Get["/sessions"] = _ =>
+            Get["/sessions"] = async (_, __) =>
             {
                 return this.Response.AsJson(this.sessionProvider.GetSessions().Select(s => new { Id = s.Id }).ToArray());
             };
 
-            Get["/sessions/{id}"] = ctx =>
+            Get["/sessions/{id}"] = async (ctx, __) =>
             {
                 Guid id;
                 if (!Guid.TryParse(ctx.Id, out id))
@@ -30,7 +30,7 @@
                     return HttpStatusCode.NotFound;
                 }
 
-                var session = 
+                var session =
                     this.sessionProvider.GetSessions().FirstOrDefault(s => s.Id == id);
 
                 if (session == null)
@@ -40,15 +40,14 @@
 
                 return this.Response.AsJson(session.RequestTraces.Select(t => new
                     {
-                        t.Method,
-                        t.RequestUrl,
-                        ResponseType = t.ResponseType.ToString(),
-                        t.RequestContentType,
-                        t.ResponseContentType,
-                        t.RequestHeaders,
-                        t.ResponseHeaders,
-                        t.StatusCode,
-                        Log = t.TraceLog.ToString().Replace("\r", "").Split(new [] { "\n" }, StringSplitOptions.None),
+                        t.RequestData.Method,
+                        RequestUrl = t.RequestData.Url,
+                        RequestContentType = t.RequestData.ContentType,
+                        ResponseContentType = t.ResponseData.ContentType,
+                        RequestHeaders = t.RequestData.Headers,
+                        ResponseHeaders = t.ResponseData.Headers,
+                        t.ResponseData.StatusCode,
+                        Log = t.TraceLog.ToString().Replace("\r", "").Split(new[] { "\n" }, StringSplitOptions.None),
                     }).ToArray());
             };
         }

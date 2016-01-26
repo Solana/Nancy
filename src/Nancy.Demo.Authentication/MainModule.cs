@@ -1,8 +1,6 @@
 namespace Nancy.Demo.Authentication
 {
-    using Nancy;
-
-    public class MainModule : NancyModule
+    public class MainModule : LegacyNancyModule
     {
         public MainModule()
         {

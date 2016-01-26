@@ -18,8 +18,8 @@
         /// <summary>
         /// Gets all the views that are currently discovered
         /// Note: this is *not* the recommended way to deal with the view locator
-        /// as it doesn't allow for runtime discovery of views with the 
-        /// <see cref="StaticConfiguration.Caching"/> settings.
+        /// as it doesn't allow for runtime discovery of views with the
+        /// <see cref="ViewConfiguration"/>.
         /// </summary>
         /// <returns>A collection of <see cref="ViewLocationResult"/> instances</returns>
         IEnumerable<ViewLocationResult> GetAllCurrentlyDiscoveredViews();

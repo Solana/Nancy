@@ -4,12 +4,12 @@
     using System.Globalization;
     using System.IO;
     using System.Threading;
+    using Configuration;
     using FakeItEasy;
     using global::Spark;
     using Nancy.Tests;
     using Nancy.ViewEngines.Spark.Tests.ViewModels;
     using Xunit;
-    using SparkViewEngine = Spark.SparkViewEngine;
 
     public class SparkViewEngineFixture
     {
@@ -17,14 +17,15 @@
         private string output;
         private FileSystemViewLocationProvider fileSystemViewLocationProvider;
         private readonly IRootPathProvider rootPathProvider;
+        private readonly INancyEnvironment environment;
 
         public SparkViewEngineFixture()
         {
             this.rootPathProvider = A.Fake<IRootPathProvider>();
             A.CallTo(() => this.rootPathProvider.GetRootPath()).Returns(Path.Combine(Environment.CurrentDirectory, "TestViews"));
-						
+
             this.fileSystemViewLocationProvider = new FileSystemViewLocationProvider(this.rootPathProvider, new DefaultFileSystemReader());
-            
+
             this.renderContext = A.Fake<IRenderContext>();
 
             var cache = A.Fake<IViewCache>();
@@ -35,6 +36,9 @@
                 });
 
             A.CallTo(() => this.renderContext.ViewCache).Returns(cache);
+
+            this.environment = new DefaultNancyEnvironment();
+            this.environment.AddValue(ViewConfiguration.Default);
         }
 
         [Fact]
@@ -72,7 +76,7 @@
             this.output.ShouldEqual("<div></div>");
         }
 
-        [Fact] 
+        [Fact]
         public void Should_be_able_to_provide_global_setting_for_views()
         {
             //Given, When
@@ -84,7 +88,7 @@
                 "<div>7==7</div>");
         }
 
-        [Fact] 
+        [Fact]
         public void Should_be_able_to_render_a_child_view_with_a_master_layout()
         {
             //Given, When
@@ -294,7 +298,7 @@
         public void Should_support_files_with_the_spark_extensions()
         {
             // Given
-            var engine = new SparkViewEngine();
+            var engine = this.CreateDefaultSparkEngine();
 
             //When
             var extensions = engine.Extensions;
@@ -492,10 +496,10 @@
             }
 
             var stream = new MemoryStream();
-            var engine = new SparkViewEngine();
+            var engine = this.CreateDefaultSparkEngine();
 
-            var locator = new DefaultViewLocator(this.fileSystemViewLocationProvider, new[] { engine });
-            
+            var locator = new DefaultViewLocator(this.fileSystemViewLocationProvider, new[] { engine }, this.environment);
+
             var context = new ViewEngineStartupContext(
                                     A.Fake<IViewCache>(),
                                     locator);
@@ -510,6 +514,11 @@
             {
                 this.output = reader.ReadToEnd();
             }
+        }
+
+        private IViewEngine CreateDefaultSparkEngine()
+        {
+            return new Spark.SparkViewEngine(new DefaultRootPathProvider(), this.environment);
         }
 
         private void FindViewAndRender(string viewName)

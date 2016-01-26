@@ -1,19 +1,21 @@
 ﻿namespace Nancy.Tests.Unit.Routing
 {
     using FakeItEasy;
-    using Fakes;
+
     using Nancy.ModelBinding;
     using Nancy.Routing;
-    using Nancy.ViewEngines;
-    using Xunit;
+    using Nancy.Tests.Fakes;
     using Nancy.Validation;
+    using Nancy.ViewEngines;
+
+    using Xunit;
 
     public class DefaultNancyModuleBuilderFixture
     {
         private readonly DefaultNancyModuleBuilder builder;
         private readonly IResponseFormatterFactory responseFormatterFactory;
         private readonly IViewFactory viewFactory;
-        private readonly NancyModule module;
+        private readonly FakeNancyModule module;
         private readonly IModelBinderLocator modelBinderLocator;
         private readonly IModelValidatorLocator validatorLocator;
 
@@ -27,6 +29,7 @@
             this.viewFactory = A.Fake<IViewFactory>();
             this.modelBinderLocator = A.Fake<IModelBinderLocator>();
             this.validatorLocator = A.Fake<IModelValidatorLocator>();
+
             this.builder = new DefaultNancyModuleBuilder(this.viewFactory, this.responseFormatterFactory, this.modelBinderLocator, this.validatorLocator);
         }
 

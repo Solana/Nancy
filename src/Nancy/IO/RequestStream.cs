@@ -3,6 +3,7 @@
     using System;
     using System.IO;
     using System.Threading.Tasks;
+
     using Nancy.Extensions;
 
     /// <summary>
@@ -73,38 +74,24 @@
             {
                 var task =
                     MoveToWritableStream();
- 
+
                 task.Wait();
-  
+
                 if (task.IsFaulted)
                 {
-                   throw new InvalidOperationException("Unable to copy stream", task.Exception);
+                    throw new InvalidOperationException("Unable to copy stream", task.Exception);
                 }
             }
 
             this.stream.Position = 0;
         }
 
-        private Task<object> MoveToWritableStream()
+        private Task MoveToWritableStream()
         {
-            var tcs = new TaskCompletionSource<object>();
-
             var sourceStream = this.stream;
             this.stream = new MemoryStream(StreamExtensions.BufferSize);
 
-            sourceStream.CopyTo(this, (source, destination, ex) =>
-            {
-                if (ex != null)
-                {
-                    tcs.SetException(ex);
-                }
-                else
-                {
-                    tcs.SetResult(null);
-                }
-            });
-
-            return tcs.Task;
+            return sourceStream.CopyToAsync(this);
         }
 
         /// <summary>
@@ -318,7 +305,7 @@
         /// </summary>
         /// <param name="value">The desired length of the current stream in bytes. </param>
         /// <exception cref="NotSupportedException">The stream does not support having it's length set.</exception>
-        /// <remarks>This functionalitry is not supported by the <see cref="RequestStream"/> type and will always throw <see cref="NotSupportedException"/>.</remarks>
+        /// <remarks>This functionality is not supported by the <see cref="RequestStream"/> type and will always throw <see cref="NotSupportedException"/>.</remarks>
         public override void SetLength(long value)
         {
             throw new NotSupportedException();
@@ -346,8 +333,8 @@
 
             if (this.stream.Length >= this.thresholdLength)
             {
-                // Close the stream here as closing it every time we call 
-                // MoveStreamContentsToFileStream causes an (ObjectDisposedException) 
+                // Close the stream here as closing it every time we call
+                // MoveStreamContentsToFileStream causes an (ObjectDisposedException)
                 // in NancyWcfGenericService - webRequest.UriTemplateMatch
                 var old = this.stream;
                 this.MoveStreamContentsToFileStream();
@@ -357,9 +344,21 @@
 
         private static FileStream CreateTemporaryFileStream()
         {
-            var filePath = Path.GetTempFileName();
+            // we could use Path.GetTempFilePath() but this is problematic on Windows and more so on Mono
+            // symptoms will show when this method has been called > 65k times
+            // see docs: https://msdn.microsoft.com/en-us/library/system.io.path.gettempfilename(v=vs.110).aspx
+            // comments on Win32 implementation: https://msdn.microsoft.com/en-us/library/windows/desktop/aa364991(v=vs.85).aspx
+            // mono implementation: https://github.com/mono/mono/blob/master/mcs/class/corlib/System.IO/Path.cs#L490
 
-            return new FileStream(filePath, FileMode.Create, FileAccess.ReadWrite, FileShare.None, 8192, true);
+            var filePath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".tmp");
+
+            return new FileStream(
+                filePath,
+                FileMode.Create,
+                FileAccess.ReadWrite,
+                FileShare.None,
+                8192,
+                StaticConfiguration.AllowFileStreamUploadAsync);         
         }
 
         private Stream CreateDefaultMemoryStream(long expectedLength)
@@ -434,7 +433,7 @@
             }
 
             // Seek to 0 if we can, although if we can't seek, and we've already written (if the size is unknown) then
-            // we are screwed anyway, and some streams that don't support seek also don't let you read hte position so
+            // we are screwed anyway, and some streams that don't support seek also don't let you read the position so
             // there's no real way to check :-/
             if (this.stream.CanSeek)
             {
